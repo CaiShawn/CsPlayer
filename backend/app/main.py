@@ -1,0 +1,36 @@
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from .core.config import settings
+from .routers import auth as auth_router
+from .routers import song as song_router
+from .routers import stream as stream_router
+
+app = FastAPI(title="wyy-web-player", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.exception_handler(Exception)
+async def unhandled(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"code": 5000, "message": str(exc), "data": None},
+    )
+
+
+@app.get("/api/health")
+async def health():
+    return {"code": 0, "message": "ok", "data": {"status": "up"}}
+
+
+app.include_router(auth_router.router, prefix="/api/auth")
+app.include_router(song_router.router, prefix="/api")
+app.include_router(stream_router.router, prefix="/api")
