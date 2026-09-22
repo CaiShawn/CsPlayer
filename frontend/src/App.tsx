@@ -5,6 +5,10 @@ import { useAuthStore } from './stores/authStore'
 import { usePlayerStore } from './stores/playerStore'
 import { MainLayout } from './components/layout/MainLayout'
 import { LoginPage } from './pages/LoginPage'
+import { HomePage } from './pages/HomePage'
+import { LikePage } from './pages/LikePage'
+import { RecordPage } from './pages/RecordPage'
+import { ShelfPage } from './pages/ShelfPage'
 import { LibraryPage } from './pages/LibraryPage'
 import { AlbumPage, PlaylistPage } from './pages/DetailPages'
 import { Loading } from './components/common/Ui'
@@ -53,7 +57,11 @@ export default function App() {
           </RequireAuth>
         }
       >
-        <Route index element={<Navigate to="/library" replace />} />
+        <Route index element={<Navigate to="/home" replace />} />
+        <Route path="home" element={<HomePage />} />
+        <Route path="like" element={<LikePage />} />
+        <Route path="record" element={<RecordPage />} />
+        <Route path="shelf" element={<ShelfPage />} />
         <Route path="library" element={<LibraryPage />} />
         <Route path="playlist/:id" element={<PlaylistPage />} />
         <Route path="album/:id" element={<AlbumPage />} />

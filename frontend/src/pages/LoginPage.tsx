@@ -11,19 +11,19 @@ export function LoginPage() {
 
   const onSuccess = useRef((user: UserProfile) => {
     loginSuccess(user)
-    navigate('/library', { replace: true })
+    navigate('/home', { replace: true })
   })
   // keep latest handlers
   onSuccess.current = (user: UserProfile) => {
     loginSuccess(user)
-    navigate('/library', { replace: true })
+    navigate('/home', { replace: true })
   }
 
   const { qrimg, status, error, refresh } = useQrLogin((user) => onSuccess.current(user))
 
   useEffect(() => {
     if (useAuthStore.getState().user) {
-      navigate('/library', { replace: true })
+      navigate('/home', { replace: true })
     }
   }, [navigate])
 

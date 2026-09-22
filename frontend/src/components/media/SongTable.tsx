@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { SongSummary } from '../../types'
 import { artistNames, formatDuration } from '../../utils/format'
 
@@ -6,9 +7,24 @@ interface Props {
   currentId?: number
   playing?: boolean
   onPlay: (index: number) => void
+  likedIds?: Set<number>
+  onToggleLike?: (song: SongSummary) => void
+  extraHeader?: ReactNode
+  extraCell?: (song: SongSummary, index: number) => ReactNode
 }
 
-export function SongTable({ tracks, currentId, playing, onPlay }: Props) {
+export function SongTable({
+  tracks,
+  currentId,
+  playing,
+  onPlay,
+  likedIds,
+  onToggleLike,
+  extraHeader,
+  extraCell,
+}: Props) {
+  const showLike = !!onToggleLike
+
   return (
     <div className="w-full overflow-hidden rounded-xl border border-neutral-800">
       <table className="w-full text-sm">
@@ -19,12 +35,15 @@ export function SongTable({ tracks, currentId, playing, onPlay }: Props) {
             <th className="px-3 py-2 text-left font-medium">歌手</th>
             <th className="hidden px-3 py-2 text-left font-medium md:table-cell">专辑</th>
             <th className="w-16 px-3 py-2 text-right font-medium">时长</th>
+            {extraHeader}
+            {showLike && <th className="w-12 px-3 py-2 text-center font-medium">红心</th>}
           </tr>
         </thead>
         <tbody>
           {tracks.map((song, index) => {
             const active = song.id === currentId
             const disabled = !song.playable
+            const liked = likedIds?.has(song.id) ?? false
             return (
               <tr
                 key={`${song.id}-${index}`}
@@ -61,6 +80,24 @@ export function SongTable({ tracks, currentId, playing, onPlay }: Props) {
                 <td className="px-3 py-2 text-right text-neutral-500">
                   {formatDuration(song.durationMs)}
                 </td>
+                {extraCell?.(song, index)}
+                {showLike && (
+                  <td className="px-3 py-2 text-center">
+                    <button
+                      type="button"
+                      title={liked ? '取消喜欢' : '喜欢'}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onToggleLike?.(song)
+                      }}
+                      className={`text-base leading-none ${
+                        liked ? 'text-red-400' : 'text-neutral-600 hover:text-red-400'
+                      }`}
+                    >
+                      {liked ? '♥' : '♡'}
+                    </button>
+                  </td>
+                )}
               </tr>
             )
           })}

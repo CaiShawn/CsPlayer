@@ -1,3 +1,4 @@
+import asyncio
 import re
 import threading
 import time
@@ -14,6 +15,7 @@ from .mappers import map_user_profile
 _QR_KEY_TTL = 25.0
 _QR_KEY_MIN_INTERVAL = 4.0
 _qr_lock = threading.Lock()
+_qr_io_lock = asyncio.Lock()
 _qr_cached: dict = {"unikey": "", "expires": 0.0, "qrimg": "", "qrurl": ""}
 _qr_last_upstream = 0.0
 
@@ -50,26 +52,34 @@ def _extract_cookies(resp) -> dict[str, str]:
 
 async def qr_key() -> dict:
     global _qr_last_upstream
+
     now = time.time()
     with _qr_lock:
         if _qr_cached["unikey"] and now < _qr_cached["expires"]:
             return {"unikey": _qr_cached["unikey"]}
-        if now - _qr_last_upstream < _QR_KEY_MIN_INTERVAL:
-            raise rate_limited("操作频繁，请稍候再试")
-        _qr_last_upstream = now
 
-    resp = await ncm_call("login_qr_key")
-    body = resp.body or {}
-    _ensure_not_busy(resp, body)
-    unikey = (body.get("data") or {}).get("unikey") or body.get("unikey")
-    if resp.status != 200 or not unikey:
-        raise bad_gateway("获取二维码 key 失败")
-    with _qr_lock:
-        _qr_cached["unikey"] = unikey
-        _qr_cached["expires"] = time.time() + _QR_KEY_TTL
-        _qr_cached["qrimg"] = ""
-        _qr_cached["qrurl"] = ""
-    return {"unikey": unikey}
+    # 并发请求合并到同一次上游拉取，避免 StrictMode / 双挂载撞 4s 限流
+    async with _qr_io_lock:
+        now = time.time()
+        with _qr_lock:
+            if _qr_cached["unikey"] and now < _qr_cached["expires"]:
+                return {"unikey": _qr_cached["unikey"]}
+            if now - _qr_last_upstream < _QR_KEY_MIN_INTERVAL:
+                raise rate_limited("操作频繁，请稍候再试")
+            _qr_last_upstream = now
+
+        resp = await ncm_call("login_qr_key")
+        body = resp.body or {}
+        _ensure_not_busy(resp, body)
+        unikey = (body.get("data") or {}).get("unikey") or body.get("unikey")
+        if resp.status != 200 or not unikey:
+            raise bad_gateway("获取二维码 key 失败")
+        with _qr_lock:
+            _qr_cached["unikey"] = unikey
+            _qr_cached["expires"] = time.time() + _QR_KEY_TTL
+            _qr_cached["qrimg"] = ""
+            _qr_cached["qrurl"] = ""
+        return {"unikey": unikey}
 
 
 async def qr_create(unikey: str) -> dict:

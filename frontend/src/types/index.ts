@@ -92,3 +92,20 @@ export interface AlbumDetail {
 export type PlayMode = 'order' | 'list-loop' | 'single' | 'shuffle'
 
 export type QrStatus = 'waiting' | 'scanned' | 'success' | 'expired' | 'rate_limited'
+
+export interface LikedSongs {
+  playlistId: number
+  tracks: SongSummary[]
+  ids: number[]
+}
+
+export interface LikeResult {
+  id: number
+  liked: boolean
+}
+
+export interface RecordItem {
+  song: SongSummary
+  playCount: number
+  score: number
+}

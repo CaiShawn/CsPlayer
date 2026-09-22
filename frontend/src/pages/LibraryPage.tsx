@@ -1,16 +1,37 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { libraryApi } from '../api'
 import type { AlbumBrief, PlaylistBrief } from '../types'
 import { Cover } from '../components/common/Cover'
 import { Empty, Loading } from '../components/common/Ui'
+import { useAuthStore } from '../stores/authStore'
+
+const PAGE_SIZE = 50
 
 export function LibraryPage() {
+  const dataVersion = useAuthStore((s) => s.dataVersion)
   const [created, setCreated] = useState<PlaylistBrief[]>([])
   const [subscribed, setSubscribed] = useState<PlaylistBrief[]>([])
   const [albums, setAlbums] = useState<AlbumBrief[]>([])
+  const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
+
+  const loadAlbums = useCallback(async (offset: number, replace: boolean) => {
+    if (replace) setError('')
+    else setLoadingMore(true)
+    try {
+      const data = await libraryApi.albums(offset, PAGE_SIZE)
+      const items = data.items || []
+      setAlbums((prev) => (replace ? items : [...prev, ...items]))
+      setHasMore(!!data.hasMore)
+    } catch (e) {
+      if (replace) setError(e instanceof Error ? e.message : '加载失败')
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -20,12 +41,13 @@ export function LibraryPage() {
       try {
         const [pl, al] = await Promise.all([
           libraryApi.playlists(),
-          libraryApi.albums(),
+          libraryApi.albums(0, PAGE_SIZE),
         ])
         if (cancelled) return
         setCreated(pl.created || [])
         setSubscribed(pl.subscribed || [])
-        setAlbums(al || [])
+        setAlbums(al.items || [])
+        setHasMore(!!al.hasMore)
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : '加载失败')
       } finally {
@@ -35,7 +57,12 @@ export function LibraryPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [dataVersion, loadAlbums])
+
+  const onLoadMoreAlbums = () => {
+    if (loadingMore || !hasMore) return
+    void loadAlbums(albums.length, false)
+  }
 
   if (loading) return <Loading />
   if (error)
@@ -73,11 +100,25 @@ export function LibraryPage() {
         {albums.length === 0 ? (
           <Empty text="暂无收藏的专辑" />
         ) : (
-          <CardGrid>
-            {albums.map((a) => (
-              <AlbumCard key={a.id} album={a} />
-            ))}
-          </CardGrid>
+          <>
+            <CardGrid>
+              {albums.map((a) => (
+                <AlbumCard key={a.id} album={a} />
+              ))}
+            </CardGrid>
+            {hasMore && (
+              <div className="mt-6 flex justify-center">
+                <button
+                  type="button"
+                  onClick={onLoadMoreAlbums}
+                  disabled={loadingMore}
+                  className="rounded-full border border-neutral-700 bg-neutral-900 px-6 py-2 text-sm text-neutral-200 hover:border-emerald-500/50 hover:text-emerald-300 disabled:opacity-50"
+                >
+                  {loadingMore ? '加载中…' : '加载更多'}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </Section>
     </div>

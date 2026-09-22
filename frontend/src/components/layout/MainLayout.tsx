@@ -1,86 +1,59 @@
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { NavLink, Outlet } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
+import { useLikesStore } from '../../stores/likesStore'
 import { usePlayerStore } from '../../stores/playerStore'
 import { useAudioEngine } from '../../hooks/useAudioEngine'
 import { PlayerBar } from '../player/PlayerBar'
 import { QueuePanel } from '../player/QueuePanel'
 import { LyricPanel } from '../lyric/LyricPanel'
+import { Toast } from '../common/Ui'
+import { TopBar } from './TopBar'
 
 export function MainLayout() {
   useAudioEngine()
-  const navigate = useNavigate()
-  const user = useAuthStore((s) => s.user)
-  const logout = useAuthStore((s) => s.logout)
-  const lyricVisible = usePlayerStore((s) => s.lyricVisible)
+  const dataVersion = useAuthStore((s) => s.dataVersion)
+  const fetchIds = useLikesStore((s) => s.fetchIds)
+  const toast = useLikesStore((s) => s.toast)
+  const setToast = useLikesStore((s) => s.setToast)
+  const currentId = usePlayerStore((s) =>
+    s.currentIndex >= 0 ? s.queue[s.currentIndex]?.id : undefined,
+  )
+  const lyricCollapsed = usePlayerStore((s) => s.lyricCollapsed)
+  const showLyric = currentId != null && !lyricCollapsed
+
+  useEffect(() => {
+    void fetchIds()
+  }, [dataVersion, fetchIds])
 
   return (
     <div className="flex h-screen flex-col bg-neutral-950 text-neutral-100">
+      <TopBar />
       <div className="flex min-h-0 flex-1">
-        <Sidebar
-          nickname={user?.nickname}
-          avatarUrl={user?.avatarUrl}
-          onLogout={async () => {
-            await logout()
-            usePlayerStore.getState().clearQueue()
-            navigate('/login')
-          }}
-        />
+        <Sidebar />
         <main className="min-w-0 flex-1 overflow-y-auto pb-24">
           <Outlet />
         </main>
-        {lyricVisible && <LyricPanel />}
+        {showLyric && <LyricPanel />}
       </div>
       <PlayerBar />
       <QueuePanel />
+      <Toast message={toast} onClose={() => setToast('')} />
     </div>
   )
 }
 
-function Sidebar({
-  nickname,
-  avatarUrl,
-  onLogout,
-}: {
-  nickname?: string
-  avatarUrl?: string
-  onLogout: () => void
-}) {
+function Sidebar() {
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-neutral-800 bg-neutral-950">
-      <div className="px-5 py-5">
-        <Link to="/library" className="text-lg font-semibold tracking-wide text-emerald-400">
-          WYY Player
-        </Link>
-        <p className="mt-1 text-xs text-neutral-500">第三方网页播放器</p>
-      </div>
-      <nav className="flex-1 space-y-1 px-3">
-        <NavItem to="/library">我的音乐</NavItem>
+      <nav className="flex-1 space-y-1 px-3 py-4">
+        <NavItem to="/home">首页</NavItem>
+        <NavItem to="/like">我喜欢</NavItem>
+        <NavItem to="/record">听歌排行榜</NavItem>
+        <NavItem to="/shelf">唱片架</NavItem>
+        <div className="my-3 border-t border-neutral-800/80" />
+        <NavItem to="/library">音乐库</NavItem>
       </nav>
-      <div className="border-t border-neutral-800 p-4">
-        <div className="flex items-center gap-3">
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt=""
-              className="h-9 w-9 rounded-full object-cover"
-            />
-          ) : (
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-800 text-xs">
-              ?
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm">{nickname || '未登录'}</div>
-            <button
-              type="button"
-              onClick={onLogout}
-              className="text-xs text-neutral-500 hover:text-neutral-200"
-            >
-              退出登录
-            </button>
-          </div>
-        </div>
-      </div>
     </aside>
   )
 }

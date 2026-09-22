@@ -7,7 +7,7 @@ from .routers import auth as auth_router
 from .routers import song as song_router
 from .routers import stream as stream_router
 
-app = FastAPI(title="wyy-web-player", version="0.1.0")
+app = FastAPI(title="CsPlayer", version="0.1.1")
 
 app.add_middleware(
     CORSMiddleware,

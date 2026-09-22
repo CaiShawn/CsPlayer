@@ -21,6 +21,12 @@ def _get_api() -> NeteaseCloudMusicApi:
     return _api
 
 
+def _reset_api() -> None:
+    """原生崩溃后重建实例，恢复后续请求。"""
+    global _api
+    _api = None
+
+
 def _invoke(fn_name: str, cookie: dict | None = None, **kwargs: Any) -> Response:
     api = _get_api()
     method = getattr(api, fn_name)
@@ -32,6 +38,12 @@ async def ncm_call(fn_name: str, cookie: dict | None = None, **kwargs: Any) -> R
 
     def runner() -> Response:
         with _lock:
-            return _invoke(fn_name, cookie, **kwargs)
+            try:
+                return _invoke(fn_name, cookie, **kwargs)
+            except Exception:
+                # 某些路由（如 record/recent/song）可能抛 access violation，
+                # 重建实例避免整条 SDK 链路瘫痪
+                _reset_api()
+                raise
 
     return await loop.run_in_executor(_executor, runner)

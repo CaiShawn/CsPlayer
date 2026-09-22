@@ -1,3 +1,4 @@
+import { useLikesStore } from '../../stores/likesStore'
 import { usePlayerStore } from '../../stores/playerStore'
 import { artistNames } from '../../utils/format'
 import { Cover } from '../common/Cover'
@@ -8,13 +9,18 @@ export function PlayerBar() {
   const currentIndex = usePlayerStore((s) => s.currentIndex)
   const playing = usePlayerStore((s) => s.playing)
   const playMode = usePlayerStore((s) => s.playMode)
+  const lyricCollapsed = usePlayerStore((s) => s.lyricCollapsed)
   const togglePlay = usePlayerStore((s) => s.togglePlay)
   const next = usePlayerStore((s) => s.next)
   const prev = usePlayerStore((s) => s.prev)
   const toggleQueue = usePlayerStore((s) => s.toggleQueue)
   const toggleLyric = usePlayerStore((s) => s.toggleLyric)
 
+  const likedIds = useLikesStore((s) => s.ids)
+  const toggleLike = useLikesStore((s) => s.toggle)
+
   const song = currentIndex >= 0 ? queue[currentIndex] : null
+  const liked = song ? likedIds.has(song.id) : false
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 h-20 border-t border-neutral-800 bg-neutral-950/95 backdrop-blur">
@@ -30,6 +36,18 @@ export function PlayerBar() {
               {song ? artistNames(song.artists) : '—'}
             </div>
           </div>
+          {song && (
+            <button
+              type="button"
+              title={liked ? '取消喜欢' : '喜欢'}
+              onClick={() => void toggleLike(song)}
+              className={`shrink-0 text-lg leading-none ${
+                liked ? 'text-red-400' : 'text-neutral-600 hover:text-red-400'
+              }`}
+            >
+              {liked ? '♥' : '♡'}
+            </button>
+          )}
         </div>
 
         {/* transport */}
@@ -79,7 +97,15 @@ export function PlayerBar() {
           <button
             type="button"
             onClick={toggleLyric}
-            className="rounded px-2 py-1 text-sm text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+            disabled={!song}
+            title={song ? (lyricCollapsed ? '展开歌词' : '收起歌词') : '未在播放'}
+            className={`rounded px-2 py-1 text-sm hover:bg-neutral-800 ${
+              !song
+                ? 'text-neutral-700'
+                : lyricCollapsed
+                  ? 'text-neutral-500 hover:text-neutral-100'
+                  : 'text-emerald-400 hover:text-emerald-300'
+            }`}
           >
             词
           </button>
@@ -88,7 +114,7 @@ export function PlayerBar() {
             onClick={toggleQueue}
             className="rounded px-2 py-1 text-sm text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
           >
-            队列
+            列
           </button>
         </div>
       </div>

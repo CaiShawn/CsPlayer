@@ -35,3 +35,20 @@ class Lyric(BaseModel):
     lrc: list[LyricLine] = []
     tlyric: list[LyricLine] = []
     hasTime: bool = True
+
+
+class LikedSongs(BaseModel):
+    playlistId: int = 0
+    tracks: list[SongSummary] = []
+    ids: list[int] = []
+
+
+class LikeResult(BaseModel):
+    id: int
+    liked: bool
+
+
+class RecordItem(BaseModel):
+    song: SongSummary
+    playCount: int = 0
+    score: int = 0

@@ -1,14 +1,18 @@
+from typing import Any
+
 from ..core.cache import cache
 from ..core.config import settings
 from ..core.errors import bad_gateway, not_found
 from ..core.ncm_client import ncm_call
 from ..models.album import AlbumBrief, AlbumDetail
 from ..models.playlist import PlaylistBrief, PlaylistDetail
+from ..models.song import LikeResult, LikedSongs, RecordItem, SongSummary
 from .mappers import (
     map_album_brief,
     map_album_detail,
     map_playlist_brief,
     map_playlist_detail,
+    map_song,
 )
 
 
@@ -45,34 +49,45 @@ async def user_playlists(cookie: dict, user_id: int) -> dict:
     return result
 
 
-async def user_albums(cookie: dict, user_id: int) -> list[AlbumBrief]:
+async def user_albums(
+    cookie: dict, user_id: int, offset: int = 0, limit: int | None = None
+) -> dict:
     key = f"user:{user_id}:albums"
     cached = cache.get(key)
-    if cached:
-        return cached
+    if not cached:
+        all_items: list[AlbumBrief] = []
+        page_offset = 0
+        while True:
+            resp = await ncm_call(
+                "album_sublist", cookie=cookie, limit=50, offset=page_offset
+            )
+            body = resp.body or {}
+            if resp.status != 200:
+                raise bad_gateway("获取收藏专辑失败")
+            data = body.get("data") or body.get("albums") or []
+            for raw in data:
+                if isinstance(raw, dict):
+                    all_items.append(map_album_brief(raw))
+            if len(data) < 50:
+                break
+            page_offset += 50
+            if page_offset > 500:
+                break
 
-    all_items: list[AlbumBrief] = []
-    offset = 0
-    while True:
-        resp = await ncm_call(
-            "album_sublist", cookie=cookie, limit=50, offset=offset
-        )
-        body = resp.body or {}
-        if resp.status != 200:
-            raise bad_gateway("获取收藏专辑失败")
-        data = body.get("data") or body.get("albums") or []
-        for raw in data:
-            if isinstance(raw, dict):
-                all_items.append(map_album_brief(raw))
-        if len(data) < 50:
-            break
-        offset += 50
-        if offset > 500:
-            break
+        cached = [a.model_dump() for a in all_items]
+        cache.set(key, cached, settings.cache_ttl["album_sublist"])
 
-    result = [a.model_dump() for a in all_items]
-    cache.set(key, result, settings.cache_ttl["album_sublist"])
-    return result
+    total = len(cached)
+    start = max(0, int(offset or 0))
+    if limit is None:
+        items = cached[start:]
+        has_more = False
+    else:
+        size = max(1, min(int(limit), 200))
+        items = cached[start : start + size]
+        has_more = start + size < total
+
+    return {"items": items, "hasMore": has_more, "total": total}
 
 
 async def playlist_detail(cookie: dict, playlist_id: int, user_id: int | None) -> PlaylistDetail:
@@ -145,3 +160,148 @@ async def album_detail(cookie: dict, album_id: int) -> AlbumDetail:
     detail = map_album_detail(album, [s for s in songs if isinstance(s, dict)])
     cache.set(key, detail.model_dump(), settings.cache_ttl["album_detail"])
     return detail
+
+
+def _is_liked_playlist(raw: dict) -> bool:
+    if raw.get("specialType") == 5:
+        return True
+    name = str(raw.get("name") or "").strip()
+    return name == "我喜欢的音乐" or name.endswith("喜欢的音乐")
+
+
+async def liked_playlist_id(cookie: dict, user_id: int) -> int:
+    key = f"user:{user_id}:liked_playlist_id"
+    cached = cache.get(key)
+    if cached:
+        return int(cached)
+
+    resp = await ncm_call("user_playlist", cookie=cookie, uid=user_id, limit=20, offset=0)
+    body = resp.body or {}
+    if resp.status != 200:
+        raise bad_gateway("获取用户歌单失败")
+    for raw in body.get("playlist") or []:
+        if isinstance(raw, dict) and _is_liked_playlist(raw):
+            pid = int(raw.get("id") or 0)
+            if pid:
+                cache.set(key, pid, settings.cache_ttl["user_playlists"])
+                return pid
+    raise not_found("未找到「我喜欢的音乐」歌单")
+
+
+async def user_liked_ids(cookie: dict, user_id: int) -> list[int]:
+    key = f"user:{user_id}:liked_ids"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+
+    resp = await ncm_call("likelist", cookie=cookie, uid=user_id)
+    body = resp.body or {}
+    if resp.status != 200:
+        raise bad_gateway("获取喜欢列表失败")
+    ids = body.get("ids") or []
+    result = [int(i) for i in ids if i is not None]
+    cache.set(key, result, settings.cache_ttl["user_liked_ids"])
+    return result
+
+
+async def user_likes(cookie: dict, user_id: int) -> LikedSongs:
+    key = f"user:{user_id}:likes"
+    cached = cache.get(key)
+    if cached:
+        return LikedSongs(**cached)
+
+    pid = await liked_playlist_id(cookie, user_id)
+    tracks_raw = await _playlist_tracks(cookie, pid)
+    tracks: list[SongSummary] = [
+        map_song(t) for t in tracks_raw if isinstance(t, dict) and t.get("id")
+    ]
+    result = LikedSongs(
+        playlistId=pid,
+        tracks=tracks,
+        ids=[t.id for t in tracks],
+    )
+    cache.set(key, result.model_dump(), settings.cache_ttl["user_likes"])
+    return result
+
+
+async def user_record_rank(
+    cookie: dict, user_id: int, type: str = "all", limit: int = 50
+) -> list[RecordItem]:
+    """听歌排行榜。type=all → allData；type=week → weekData。
+
+    注意：真正的「最近播放」需 /record/recent/song，当前 SDK 登录态会原生崩溃，
+    详见 docs/DEBUG.md。本接口仅使用稳定的 user_record。
+    """
+    limit = max(1, min(int(limit or 50), 100))
+    ncm_type = 1 if type == "week" else 0
+    key = f"user:{user_id}:record:{ncm_type}:{limit}"
+    cached = cache.get(key)
+    if cached is not None:
+        return [RecordItem(**s) for s in cached]
+
+    resp = await ncm_call("user_record", cookie=cookie, uid=user_id, type=ncm_type)
+    body = resp.body or {}
+    if resp.status != 200:
+        raise bad_gateway("获取听歌排行失败")
+
+    if ncm_type == 1:
+        raw_list = body.get("weekData") or body.get("allData") or []
+    else:
+        raw_list = body.get("allData") or body.get("weekData") or []
+
+    items: list[RecordItem] = []
+    for entry in raw_list:
+        if not isinstance(entry, dict):
+            continue
+        raw = entry.get("song") or entry.get("data") or None
+        if not isinstance(raw, dict) or not raw.get("id"):
+            continue
+        items.append(
+            RecordItem(
+                song=map_song(raw),
+                playCount=int(entry.get("playCount") or 0),
+                score=int(entry.get("score") or 0),
+            )
+        )
+        if len(items) >= limit:
+            break
+
+    cache.set(key, [i.model_dump() for i in items], settings.cache_ttl["user_recent"])
+    return items
+
+
+async def _invalidate_like_cache(
+    cookie: dict, user_id: int, song_id: int | None = None
+) -> None:
+    cache.invalidate(f"user:{user_id}:likes")
+    cache.invalidate(f"user:{user_id}:liked_ids")
+    cache.invalidate(f"user:{user_id}:playlists")
+    if song_id is not None:
+        cache.invalidate(f"song:{song_id}:detail")
+    try:
+        pid = await liked_playlist_id(cookie, user_id)
+        cache.invalidate(f"playlist:{pid}:tracks")
+        cache.invalidate(f"playlist:{pid}:detail")
+    except Exception:
+        pass
+
+
+async def toggle_like(cookie: dict, user_id: int, song_id: int, like: bool) -> LikeResult:
+    resp = await ncm_call("like", cookie=cookie, id=song_id, like=like)
+    body: dict[str, Any] = resp.body or {}
+    code = int(body.get("code") or resp.status or 0)
+
+    if resp.status != 200 or code not in (200, 0):
+        # 回退：对「我喜欢的音乐」歌单增删曲
+        pid = await liked_playlist_id(cookie, user_id)
+        op = "add" if like else "del"
+        resp2 = await ncm_call(
+            "playlist_tracks", cookie=cookie, op=op, pid=pid, tracks=str(song_id)
+        )
+        body2 = resp2.body or {}
+        code2 = int(body2.get("code") or resp2.status or 0)
+        if resp2.status != 200 or code2 not in (200, 0):
+            raise bad_gateway("更新喜欢状态失败")
+
+    await _invalidate_like_cache(cookie, user_id, song_id)
+    return LikeResult(id=song_id, liked=like)

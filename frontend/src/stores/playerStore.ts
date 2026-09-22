@@ -25,7 +25,8 @@ interface PlayerState {
   lyric: Lyric
   currentLyricIndex: number
   queueVisible: boolean
-  lyricVisible: boolean
+  /** session-only lyric panel collapse preference */
+  lyricCollapsed: boolean
   /** bumps when a new song should be loaded into audio element */
   loadToken: number
 
@@ -50,6 +51,7 @@ interface PlayerState {
   syncLyricIndex: (timeSec: number) => void
   toggleQueue: () => void
   toggleLyric: () => void
+  setLyricCollapsed: (v: boolean) => void
   handleEnded: () => void
 }
 
@@ -106,7 +108,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   lyric: emptyLyric,
   currentLyricIndex: -1,
   queueVisible: false,
-  lyricVisible: true,
+  lyricCollapsed: false,
   loadToken: 0,
 
   currentSong: () => {
@@ -249,7 +251,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   toggleQueue: () => set({ queueVisible: !get().queueVisible }),
-  toggleLyric: () => set({ lyricVisible: !get().lyricVisible }),
+  toggleLyric: () => set({ lyricCollapsed: !get().lyricCollapsed }),
+  setLyricCollapsed: (v) => set({ lyricCollapsed: v }),
 
   handleEnded: () => {
     const s = get()

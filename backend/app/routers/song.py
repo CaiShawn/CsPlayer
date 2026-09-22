@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends, Query
 
 from ..models.common import ApiResponse, ok
 from ..services import library_service, music_service
@@ -14,8 +14,14 @@ async def user_playlists(session: dict = Depends(get_session)) -> ApiResponse:
 
 
 @router.get("/user/albums")
-async def user_albums(session: dict = Depends(get_session)) -> ApiResponse:
-    data = await library_service.user_albums(session["cookie"], session["user_id"])
+async def user_albums(
+    offset: int = Query(default=0, ge=0),
+    limit: int | None = Query(default=None, ge=1, le=200),
+    session: dict = Depends(get_session),
+) -> ApiResponse:
+    data = await library_service.user_albums(
+        session["cookie"], session["user_id"], offset=offset, limit=limit
+    )
     return ok(data)
 
 
@@ -59,3 +65,40 @@ async def song_lyric(song_id: int, session: dict = Depends(get_session)) -> ApiR
 async def song_detail(song_id: int, session: dict = Depends(get_session)) -> ApiResponse:
     data = await music_service.song_detail(session["cookie"], song_id)
     return ok(data.model_dump())
+
+
+@router.get("/user/likes")
+async def user_likes(session: dict = Depends(get_session)) -> ApiResponse:
+    data = await library_service.user_likes(session["cookie"], session["user_id"])
+    return ok(data.model_dump())
+
+
+@router.get("/user/liked-ids")
+async def user_liked_ids(session: dict = Depends(get_session)) -> ApiResponse:
+    ids = await library_service.user_liked_ids(session["cookie"], session["user_id"])
+    return ok({"ids": ids})
+
+
+@router.post("/song/{song_id}/like")
+async def song_like(
+    song_id: int,
+    body: dict = Body(default={}),
+    session: dict = Depends(get_session),
+) -> ApiResponse:
+    like = bool((body or {}).get("like", True))
+    data = await library_service.toggle_like(
+        session["cookie"], session["user_id"], song_id, like
+    )
+    return ok(data.model_dump())
+
+
+@router.get("/user/record")
+async def user_record(
+    type: str = Query(default="all", pattern="^(all|week)$"),
+    limit: int = Query(default=50, ge=1, le=100),
+    session: dict = Depends(get_session),
+) -> ApiResponse:
+    items = await library_service.user_record_rank(
+        session["cookie"], session["user_id"], type=type, limit=limit
+    )
+    return ok([i.model_dump() for i in items])

@@ -5,10 +5,15 @@ import type { PlaylistDetail, SongSummary } from '../types'
 import { Cover } from '../components/common/Cover'
 import { Empty, Loading } from '../components/common/Ui'
 import { SongTable } from '../components/media/SongTable'
+import { useAuthStore } from '../stores/authStore'
+import { useLikesStore } from '../stores/likesStore'
 import { usePlayerStore } from '../stores/playerStore'
 
 export function PlaylistPage() {
   const { id } = useParams()
+  const dataVersion = useAuthStore((s) => s.dataVersion)
+  const likedIds = useLikesStore((s) => s.ids)
+  const toggleLike = useLikesStore((s) => s.toggle)
   const [detail, setDetail] = useState<PlaylistDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -36,7 +41,7 @@ export function PlaylistPage() {
     return () => {
       cancelled = true
     }
-  }, [id])
+  }, [id, dataVersion])
 
   if (loading) return <Loading />
   if (error) return <div className="p-8 text-center text-sm text-red-400">{error}</div>
@@ -74,6 +79,8 @@ export function PlaylistPage() {
             currentId={currentId}
             playing={playing}
             onPlay={onPlay}
+            likedIds={likedIds}
+            onToggleLike={(song) => void toggleLike(song)}
           />
         )}
       </div>
@@ -83,6 +90,9 @@ export function PlaylistPage() {
 
 export function AlbumPage() {
   const { id } = useParams()
+  const dataVersion = useAuthStore((s) => s.dataVersion)
+  const likedIds = useLikesStore((s) => s.ids)
+  const toggleLike = useLikesStore((s) => s.toggle)
   const [detail, setDetail] = useState<{
     id: number
     name: string
@@ -117,7 +127,7 @@ export function AlbumPage() {
     return () => {
       cancelled = true
     }
-  }, [id])
+  }, [id, dataVersion])
 
   if (loading) return <Loading />
   if (error) return <div className="p-8 text-center text-sm text-red-400">{error}</div>
@@ -155,6 +165,8 @@ export function AlbumPage() {
             currentId={currentId}
             playing={playing}
             onPlay={onPlay}
+            likedIds={likedIds}
+            onToggleLike={(song) => void toggleLike(song)}
           />
         )}
       </div>

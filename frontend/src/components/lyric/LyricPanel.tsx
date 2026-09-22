@@ -5,7 +5,6 @@ import { artistNames } from '../../utils/format'
 export function LyricPanel() {
   const lyric = usePlayerStore((s) => s.lyric)
   const currentLyricIndex = usePlayerStore((s) => s.currentLyricIndex)
-  const lyricVisible = usePlayerStore((s) => s.lyricVisible)
   const queue = usePlayerStore((s) => s.queue)
   const currentIndex = usePlayerStore((s) => s.currentIndex)
   const listRef = useRef<HTMLDivElement>(null)
@@ -21,15 +20,26 @@ export function LyricPanel() {
     }
   }, [currentLyricIndex])
 
-  if (!lyricVisible) return null
+  // 未播放（无曲目）不渲染
+  if (!song) return null
 
   return (
     <aside className="flex w-80 shrink-0 flex-col border-l border-neutral-800 bg-neutral-950">
-      <div className="border-b border-neutral-800 px-4 py-4">
-        <div className="text-sm text-neutral-100">{song?.name || '未在播放'}</div>
-        <div className="text-xs text-neutral-500">
-          {song ? artistNames(song.artists) : '—'}
+      <div className="flex items-start justify-between gap-2 border-b border-neutral-800 px-4 py-4">
+        <div className="min-w-0">
+          <div className="truncate text-sm text-neutral-100">{song.name}</div>
+          <div className="truncate text-xs text-neutral-500">
+            {artistNames(song.artists)}
+          </div>
         </div>
+        <button
+          type="button"
+          title="收起歌词"
+          onClick={() => usePlayerStore.getState().setLyricCollapsed(true)}
+          className="shrink-0 rounded px-2 py-1 text-xs text-neutral-500 hover:bg-neutral-900 hover:text-neutral-200"
+        >
+          收起
+        </button>
       </div>
       <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-6">
         {lyric.lrc.length === 0 && (
