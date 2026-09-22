@@ -1,5 +1,5 @@
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from ..core.config import settings
@@ -10,8 +10,13 @@ router = APIRouter(tags=["stream"])
 
 
 @router.get("/stream/{song_id}")
-async def stream(song_id: int, request: Request, session: dict = Depends(get_session)):
-    song_url = await music_service.song_url(session["cookie"], song_id)
+async def stream(
+    song_id: int,
+    request: Request,
+    level: str | None = Query(default=None),
+    session: dict = Depends(get_session),
+):
+    song_url = await music_service.song_url(session["cookie"], song_id, level=level)
     if not song_url.playable or not song_url.url:
         raise HTTPException(status_code=403, detail={"code": 3001, "message": "暂无版权或无法播放"})
 

@@ -1,4 +1,5 @@
-import { usePlayerStore } from '../../stores/playerStore'
+import { useEffect, useRef, useState } from 'react'
+import { usePlayerStore, PLAY_MODE_LABEL, QUALITY_LABEL, QUALITY_LEVELS } from '../../stores/playerStore'
 import { formatTime } from '../../utils/format'
 
 export function ProgressBar() {
@@ -71,9 +72,59 @@ export function PlayModeButton() {
       type="button"
       onClick={togglePlayMode}
       className="rounded px-2 py-1 text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100"
-      title="播放模式"
+      title={PLAY_MODE_LABEL[playMode]}
     >
-      <span className="text-lg leading-none">{icon[playMode]}</span>
+      <span className="text-sm leading-none">{icon[playMode]}</span>
     </button>
+  )
+}
+
+export function QualitySelector() {
+  const quality = usePlayerStore((s) => s.quality)
+  const setQuality = usePlayerStore((s) => s.setQuality)
+  const [open, setOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        title="音质选择"
+        className="rounded px-2 py-1 text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100"
+      >
+        <span className="text-xs leading-none">{QUALITY_LABEL[quality]}</span>
+      </button>
+      {open && (
+        <div className="absolute bottom-full left-1/2 z-50 mb-2 w-28 -translate-x-1/2 overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 py-1 shadow-xl">
+          {QUALITY_LEVELS.map((lv) => (
+            <button
+              key={lv}
+              type="button"
+              className={`block w-full px-4 py-2 text-left text-sm hover:bg-neutral-800 ${
+                lv === quality ? 'text-emerald-400' : 'text-neutral-200'
+              }`}
+              onClick={() => {
+                setQuality(lv)
+                setOpen(false)
+              }}
+            >
+              {QUALITY_LABEL[lv]}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

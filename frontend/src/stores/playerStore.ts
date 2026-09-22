@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Lyric, PlayMode, SongSummary } from '../types'
+import type { Lyric, PlayMode, QualityLevel, SongSummary } from '../types'
 import { findLyricIndex } from '../utils/lyric'
 
 const emptyLyric: Lyric = { lrc: [], tlyric: [], hasTime: true }
@@ -13,11 +13,26 @@ export const PLAY_MODE_LABEL: Record<PlayMode, string> = {
   shuffle: '随机播放',
 }
 
+/** 前端仅暴露三档：SQ / HQ / 标准，其余 level 由后端能力决定 */
+export const QUALITY_LEVELS: QualityLevel[] = ['lossless', 'exhigh', 'standard']
+
+export const QUALITY_LABEL: Record<QualityLevel, string> = {
+  standard: '标准',
+  higher: '较高',
+  exhigh: 'HQ',
+  lossless: 'SQ',
+  hires: 'Hi-Res',
+  jyeffect: '环绕',
+  sky: '沉浸',
+  jymaster: '母带',
+}
+
 interface PlayerState {
   queue: SongSummary[]
   currentIndex: number
   playing: boolean
   playMode: PlayMode
+  quality: QualityLevel
   currentTime: number
   duration: number
   volume: number
@@ -44,6 +59,7 @@ interface PlayerState {
   toggleMute: () => void
   setPlayMode: (m: PlayMode) => void
   togglePlayMode: () => void
+  setQuality: (q: QualityLevel) => void
   jumpTo: (index: number) => void
   removeFromQueue: (index: number) => void
   clearQueue: () => void
@@ -101,6 +117,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   currentIndex: -1,
   playing: false,
   playMode: 'list-loop',
+  quality: 'lossless', // 默认 SQ（无损）
   currentTime: 0,
   duration: 0,
   volume: 0.8,
@@ -187,6 +204,17 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   togglePlayMode: () => {
     const i = PLAY_MODES.indexOf(get().playMode)
     set({ playMode: PLAY_MODES[(i + 1) % PLAY_MODES.length] })
+  },
+  setQuality: (q) => {
+    const s = get()
+    if (s.quality === q) return
+    // 切换音质后重载当前曲
+    set({
+      quality: q,
+      currentTime: 0,
+      duration: 0,
+      loadToken: s.loadToken + 1,
+    })
   },
 
   jumpTo: (index) => {

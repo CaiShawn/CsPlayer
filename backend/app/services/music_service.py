@@ -59,23 +59,74 @@ async def song_detail(cookie: dict, song_id: int) -> SongSummary:
     return summary
 
 
-async def song_url(cookie: dict, song_id: int) -> SongUrl:
-    key = f"song:{song_id}:url"
+# SDK song_url_v1 level：standard/higher/exhigh/lossless/hires/jyeffect/sky/dolby/jymaster
+QUALITY_LEVELS = (
+    "standard",
+    "higher",
+    "exhigh",
+    "lossless",
+    "hires",
+    "jyeffect",
+    "sky",
+    "jymaster",
+)
+# level → 旧接口 br 回退（bps）
+_QUALITY_BR = {
+    "standard": 128000,
+    "higher": 192000,
+    "exhigh": 320000,
+    "lossless": 999000,
+    "hires": 999000,
+    "jyeffect": 999000,
+    "sky": 999000,
+    "jymaster": 999000,
+}
+
+
+def normalize_quality(level: str | None) -> str:
+    lv = (level or "").strip().lower()
+    return lv if lv in QUALITY_LEVELS else "lossless"
+
+
+async def song_url(cookie: dict, song_id: int, level: str | None = None) -> SongUrl:
+    quality = normalize_quality(level)
+    key = f"song:{song_id}:url:{quality}"
     cached = cache.get(key)
     if cached:
         return SongUrl(**cached)
 
-    resp = await ncm_call("song_url", cookie=cookie, id=str(song_id), br=999000)
-    body = resp.body or {}
-    if resp.status != 200:
+    body: dict = {}
+    status = 0
+    try:
+        resp = await ncm_call("song_url_v1", cookie=cookie, id=str(song_id), level=quality)
+        body = resp.body if isinstance(resp.body, dict) else {}
+        status = resp.status
+    except Exception:
+        body = {}
+        status = 0
+
+    # v1 无结果时回退旧 song_url(br)
+    if status != 200 or not (body.get("data") or []):
+        resp = await ncm_call(
+            "song_url",
+            cookie=cookie,
+            id=str(song_id),
+            br=_QUALITY_BR.get(quality, 320000),
+        )
+        body = resp.body if isinstance(resp.body, dict) else {}
+        status = resp.status
+
+    if status != 200:
         raise bad_gateway("获取播放地址失败")
-    data = (body.get("data") or [])
+
+    data = body.get("data") or []
     item = data[0] if data and isinstance(data[0], dict) else {}
     url = item.get("url") or ""
     result = SongUrl(
         id=song_id,
         url=url,
         br=int(item.get("br") or 0),
+        level=quality,
         expireAt=int(time.time()) + settings.cache_ttl["song_url"],
         playable=bool(url),
     )

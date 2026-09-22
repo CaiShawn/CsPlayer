@@ -25,7 +25,7 @@ export function TopBar() {
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b border-neutral-800 bg-neutral-950 px-4">
-      <div className="min-w-0">
+      <div className="min-w-0 select-none">
         <div className="text-base font-semibold tracking-wide text-emerald-400">CsPlayer</div>
         <div className="truncate text-[10px] leading-3 text-neutral-500">
           Third-party web player for NCM

@@ -13,6 +13,7 @@ export function useAudioEngine() {
   const playing = usePlayerStore((s) => s.playing)
   const volume = usePlayerStore((s) => s.volume)
   const muted = usePlayerStore((s) => s.muted)
+  const quality = usePlayerStore((s) => s.quality)
 
   useEffect(() => {
     const audio = new Audio()
@@ -68,8 +69,9 @@ export function useAudioEngine() {
 
     const load = async () => {
       try {
+        const level = usePlayerStore.getState().quality
         const [urlRes, lyricRes] = await Promise.all([
-          songApi.url(song.id),
+          songApi.url(song.id, level),
           songApi.lyric(song.id).catch(() => ({ lrc: [], tlyric: [], hasTime: true })),
         ])
         if (cancelled) return
@@ -97,7 +99,7 @@ export function useAudioEngine() {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadToken])
+  }, [loadToken, quality])
 
   // play / pause
   useEffect(() => {

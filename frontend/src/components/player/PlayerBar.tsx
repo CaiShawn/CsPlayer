@@ -2,13 +2,12 @@ import { useLikesStore } from '../../stores/likesStore'
 import { usePlayerStore } from '../../stores/playerStore'
 import { artistNames } from '../../utils/format'
 import { Cover } from '../common/Cover'
-import { PlayModeButton, ProgressBar, VolumeControl } from './Controls'
+import { PlayModeButton, ProgressBar, QualitySelector, VolumeControl } from './Controls'
 
 export function PlayerBar() {
   const queue = usePlayerStore((s) => s.queue)
   const currentIndex = usePlayerStore((s) => s.currentIndex)
   const playing = usePlayerStore((s) => s.playing)
-  const playMode = usePlayerStore((s) => s.playMode)
   const lyricCollapsed = usePlayerStore((s) => s.lyricCollapsed)
   const togglePlay = usePlayerStore((s) => s.togglePlay)
   const next = usePlayerStore((s) => s.next)
@@ -78,15 +77,7 @@ export function PlayerBar() {
             >
               ⏭
             </button>
-            <span className="w-16 text-xs text-neutral-500">
-              {playMode === 'order'
-                ? '顺序'
-                : playMode === 'list-loop'
-                  ? '列表循环'
-                  : playMode === 'single'
-                    ? '单曲'
-                    : '随机'}
-            </span>
+            <QualitySelector />
           </div>
           <ProgressBar />
         </div>

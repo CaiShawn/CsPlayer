@@ -2,7 +2,7 @@ from typing import Any
 
 from ..core.cache import cache
 from ..core.config import settings
-from ..core.errors import bad_gateway, not_found
+from ..core.errors import bad_gateway, not_found, unauthorized
 from ..core.ncm_client import ncm_call
 from ..models.album import AlbumBrief, AlbumDetail
 from ..models.playlist import PlaylistBrief, PlaylistDetail
@@ -61,10 +61,19 @@ async def user_albums(
             resp = await ncm_call(
                 "album_sublist", cookie=cookie, limit=50, offset=page_offset
             )
-            body = resp.body or {}
-            if resp.status != 200:
+            body = resp.body if isinstance(resp.body, dict) else {}
+            code = int(body.get("code") or resp.status or 0)
+            if resp.status == 301 or code == 301:
+                raise unauthorized("登录已失效，请重新登录")
+            if resp.status != 200 or code not in (200, 0):
                 raise bad_gateway("获取收藏专辑失败")
-            data = body.get("data") or body.get("albums") or []
+            data = body.get("data")
+            if not isinstance(data, list):
+                data = body.get("album")
+            if not isinstance(data, list):
+                data = body.get("albums") or []
+            if not isinstance(data, list):
+                data = []
             for raw in data:
                 if isinstance(raw, dict):
                     all_items.append(map_album_brief(raw))

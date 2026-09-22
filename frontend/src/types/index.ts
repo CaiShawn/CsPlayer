@@ -30,10 +30,22 @@ export interface SongSummary {
   reason: string
 }
 
+/** SDK song_url_v1 level */
+export type QualityLevel =
+  | 'standard'
+  | 'higher'
+  | 'exhigh'
+  | 'lossless'
+  | 'hires'
+  | 'jyeffect'
+  | 'sky'
+  | 'jymaster'
+
 export interface SongUrl {
   id: number
   url: string
   br: number
+  level: QualityLevel
   expireAt: number
   playable: boolean
 }

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -18,11 +18,25 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(HTTPException)
+async def http_error(request: Request, exc: HTTPException):
+    detail = exc.detail
+    if isinstance(detail, dict):
+        content = {
+            "code": detail.get("code", exc.status_code),
+            "message": detail.get("message", "请求失败"),
+            "data": None,
+        }
+    else:
+        content = {"code": exc.status_code, "message": str(detail), "data": None}
+    return JSONResponse(status_code=exc.status_code, content=content)
+
+
 @app.exception_handler(Exception)
 async def unhandled(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
-        content={"code": 5000, "message": str(exc), "data": None},
+        content={"code": 5000, "message": "服务器内部错误", "data": None},
     )
 
 

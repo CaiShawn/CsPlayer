@@ -44,12 +44,17 @@ async def album_detail(
 
 
 @router.get("/song/{song_id}/url")
-async def song_url(song_id: int, session: dict = Depends(get_session)) -> ApiResponse:
-    data = await music_service.song_url(session["cookie"], song_id)
+async def song_url(
+    song_id: int,
+    level: str | None = Query(default=None),
+    session: dict = Depends(get_session),
+) -> ApiResponse:
+    data = await music_service.song_url(session["cookie"], song_id, level=level)
     # do not expose upstream url to browser; stream goes through proxy
     payload = data.model_dump()
     if payload.get("playable"):
-        payload["url"] = f"/api/stream/{song_id}"
+        q = data.level or "lossless"
+        payload["url"] = f"/api/stream/{song_id}?level={q}"
     else:
         payload["url"] = ""
     return ok(payload)

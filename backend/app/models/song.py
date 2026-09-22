@@ -22,6 +22,7 @@ class SongUrl(BaseModel):
     id: int
     url: str = ""
     br: int = 0
+    level: str = "lossless"
     expireAt: int = 0
     playable: bool = True
 

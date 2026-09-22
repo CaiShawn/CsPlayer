@@ -11,6 +11,7 @@ import type {
   PlaylistDetail,
   QrStatus,
   SongUrl,
+  QualityLevel,
   UserProfile,
   PlaylistBrief,
   RecordItem,
@@ -47,7 +48,10 @@ export const libraryApi = {
 }
 
 export const songApi = {
-  url: (id: number) => api.get<SongUrl>(`/api/song/${id}/url`),
+  url: (id: number, level?: QualityLevel | string) =>
+    api.get<SongUrl>(
+      level ? `/api/song/${id}/url?level=${encodeURIComponent(level)}` : `/api/song/${id}/url`,
+    ),
   lyric: (id: number) => api.get<Lyric>(`/api/song/${id}/lyric`),
   like: (id: number, like: boolean) =>
     api.post<LikeResult>(`/api/song/${id}/like`, { like }),
