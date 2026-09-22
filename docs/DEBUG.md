@@ -46,3 +46,64 @@ MusicLibrary: NeteaseCloudMusicApi.record_recent_song(cookie={...登录态...})
 1. 等 MusicLibrary / NeteaseCloudMusicApi 修复 `/record/recent/song` 绑定后再接入。
 2. 或改为自管 HTTP 会话调用网易云官方最近播放接口，绕开 MusicLibrary 该路由。
 3. 恢复前对照本节现象做登录态回归。
+
+---
+
+## 2026-06 · SDK 生命周期残留风险与隔离方案（记录，暂不实施）
+
+### 现状约束
+
+`backend/app/core/ncm_client.py` 当前策略：
+
+- 禁止调用原生 `destroy()` / `destroy_context()`（会拆掉全局 QuickJS 上下文，之后 `ncm_init` 可能 `access violation reading 0x0`）。
+- 异常时只把 Python 实例丢进 `_retired` 并重建，**故意泄漏**旧实例以避免二次 AV。
+- 进程内单例 + 单线程 executor 串行化 SDK 调用。
+
+### 残留风险
+
+| 风险 | 影响 | 现缓解 |
+|------|------|--------|
+| `_retired` 无界增长 | 错误风暴下内存缓慢膨胀，无法回收原生上下文 | 重启进程 |
+| 误 reset（非原生异常也走 `_reset_api`） | 不必要重建 + 加速泄漏 | 收窄异常匹配（待做） |
+| 任一原生 AV 可能毒化全局上下文 | 后续请求全部失败，直到重启 | 进程重启 |
+| `record/recent/song` 登录态崩溃 | 功能已搁置（见上节） | 不启用该路由 |
+
+**接受现状的理由**：本地单人播放器，请求量低，重启成本可接受；继续在同进程内修补 destroy 边界收益有限。
+
+### 推荐方案：子进程隔离 Worker（若将来要做）
+
+把 MusicLibrary / QuickJS 整体挪进**独立子进程**，主进程只通过 RPC 调用 `ncm_call`：
+
+```text
+FastAPI 主进程
+  └─ ncm_client (RPC client, asyncio)
+       └─ pipe / unix socket
+            └─ worker 子进程
+                 └─ NeteaseCloudMusicApi + QuickJS + engine.dll
+```
+
+要点：
+
+1. **崩溃边界**：worker 内 AV / segfault 只杀死子进程；主进程捕获后丢弃该次请求（映射 502），并自动拉起新 worker。
+2. **泄漏回收**：worker 退出即释放全部原生上下文与 `_retired`，无需再「故意泄漏」；主进程内存不再随失败增长。
+3. **可试验危险路由**：`record_recent_song` 等可在 worker 里调用；崩溃只废 worker，不拖垮 API 服务。若将来重启「最近播放」，优先在隔离 worker 里做登录态回归。
+4. **协议**：请求 `{"fn": "song_url_v1", "cookie": {...}, "kwargs": {...}}`，响应 `{"ok": true, "status": 200, "body": ...}` / `{"ok": false, "error": "..."}`。cookie 不落盘，仅经管道传递。
+5. **生命周期**：空闲超时或连续失败 N 次后主动回收 worker；启动时先 `ncm_init` 探活，失败则指数退避重启。
+6. **线程模型**：worker 内仍保持单线程串行（SDK 非线程安全）；主进程可并发挂多个请求，由 RPC 层排队进 worker。
+
+代价：
+
+- IPC 序列化延迟（本地 pipe 可忽略）；
+- 多一层进程管理与部署复杂度（Windows 下需处理 `engine.dll` / `ncm_music_api.dll` 加载路径）；
+- 测试与调试链路变长。
+
+### 决策
+
+- **最近播放**：已确认放弃，不再投入。
+- **隔离 worker**：作为上述残留风险的根治方案记录在案；当前阶段**维持同进程策略**，优先级低于功能与缓存串号等问题。触发升级的信号：生产运行中出现多次「必须重启才能恢复」的 AV，或需要重新试验带登录态的危险 SDK 路由。
+
+### 附：若暂不隔离，最小加固项
+
+1. `ncm_call` 仅在 `OSError` / `access violation` 时 `_reset_api`，其余异常原样抛出（减缓 `_retired` 增长）。
+2. 给 `_retired` 加长度上限与告警日志，超限时提示「该重启了」。
+3. 健康检查 `/api/health` 可选做一次轻量 SDK 探活，便于外部脚本自动重启。
