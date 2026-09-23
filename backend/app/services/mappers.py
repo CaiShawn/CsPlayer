@@ -2,6 +2,7 @@
 
 from ..models.album import AlbumBrief, AlbumDetail
 from ..models.playlist import PlaylistBrief, PlaylistDetail
+from ..models.search import ArtistBrief
 from ..models.song import SongArtist, SongSummary
 from ..models.user import UserProfile
 
@@ -34,6 +35,22 @@ def map_song(raw: dict) -> SongSummary:
         coverUrl=str(cover or ""),
         durationMs=int(duration or 0),
         playable=True,
+    )
+
+
+def map_artist_brief(raw: dict) -> ArtistBrief:
+    alias = raw.get("alias") or raw.get("transNames") or []
+    if isinstance(alias, str):
+        alias = [alias]
+    alias_text = " / ".join(str(a) for a in alias if a)
+    avatar = raw.get("picUrl") or raw.get("img1v1Url") or ""
+    return ArtistBrief(
+        id=int(raw.get("id") or 0),
+        name=str(raw.get("name") or ""),
+        avatarUrl=str(avatar or ""),
+        alias=alias_text,
+        musicSize=int(raw.get("musicSize") or 0),
+        albumSize=int(raw.get("albumSize") or 0),
     )
 
 
@@ -83,13 +100,18 @@ def map_playlist_detail(
 def map_album_brief(raw: dict) -> AlbumBrief:
     artist = raw.get("artist") or {}
     artists = raw.get("artists") or []
+    artist_id = artist.get("id")
     artist_name = artist.get("name")
-    if not artist_name and artists:
-        artist_name = artists[0].get("name")
+    if artists and isinstance(artists[0], dict):
+        if not artist_id:
+            artist_id = artists[0].get("id")
+        if not artist_name:
+            artist_name = artists[0].get("name")
     return AlbumBrief(
         id=int(raw.get("id") or 0),
         name=str(raw.get("name") or ""),
         coverUrl=str(raw.get("picUrl") or raw.get("blurPicUrl") or ""),
+        artistId=int(artist_id or 0),
         artistName=str(artist_name or ""),
         publishTime=raw.get("publishTime"),
         size=int(raw.get("size") or 0),

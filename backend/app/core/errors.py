@@ -17,6 +17,10 @@ def not_found(message: str = "资源不存在") -> HTTPException:
     return HTTPException(status_code=404, detail={"code": 2001, "message": message})
 
 
+def bad_request(message: str = "请求参数错误") -> HTTPException:
+    return HTTPException(status_code=400, detail={"code": 1002, "message": message})
+
+
 def bad_gateway(message: str = "上游服务失败") -> HTTPException:
     return HTTPException(status_code=502, detail={"code": 5001, "message": message})
 

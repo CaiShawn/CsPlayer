@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { usePlayerStore } from '../stores/playerStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { ColorPicker } from '../components/settings/ColorPicker'
+import { ContextMenuSettings } from '../components/settings/ContextMenuSettings'
 import { Segmented, SettingRow, SettingSection, Switch } from '../components/settings/controls'
 import { APP_VERSION } from '../version'
 
@@ -9,6 +11,7 @@ const GROUPS = [
   { id: 'appearance', label: '外观' },
   { id: 'playback', label: '播放' },
   { id: 'lyric', label: '歌词' },
+  { id: 'contextMenu', label: '右键菜单' },
   { id: 'cache', label: '缓存' },
   { id: 'about', label: '关于' },
 ]
@@ -36,6 +39,18 @@ export function SettingsPage() {
   const [usage, setUsage] = useState(() => estimateStorageBytes())
   const [activeId, setActiveId] = useState(GROUPS[0].id)
   const rootRef = useRef<HTMLDivElement>(null)
+  const [searchParams] = useSearchParams()
+
+  // 「自定义此菜单…」等入口可带 ?group=contextMenu 直达对应分组
+  useEffect(() => {
+    const group = searchParams.get('group')
+    if (!group || !GROUPS.some((g) => g.id === group)) return
+    const t = window.setTimeout(() => {
+      setActiveId(group)
+      document.getElementById(group)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
+    return () => window.clearTimeout(t)
+  }, [searchParams])
 
   // 滚动联动：高亮当前分组（主滚动容器为 <main>）
   useEffect(() => {
@@ -199,6 +214,9 @@ export function SettingsPage() {
             />
           </SettingRow>
         </SettingSection>
+
+        {/* 右键菜单 */}
+        <ContextMenuSettings />
 
         {/* 缓存 */}
         <SettingSection id="cache" title="缓存" desc="本地数据占用与重置">

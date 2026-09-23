@@ -1,3 +1,4 @@
+import { useContextMenuStore } from '../../stores/contextMenuStore'
 import { usePlayerStore } from '../../stores/playerStore'
 import { artistNames } from '../../utils/format'
 
@@ -42,6 +43,13 @@ export function QueuePanel() {
           <div
             key={`${song.id}-${index}`}
             onDoubleClick={() => jumpTo(index)}
+            onContextMenu={(e) =>
+              useContextMenuStore.getState().openForEvent(e, {
+                kind: 'song',
+                song,
+                queueIndex: index,
+              })
+            }
             className={`group flex items-center gap-2 px-4 py-[var(--space-row-y)] text-sm ${
               index === currentIndex
                 ? 'bg-accent/10 text-accent-soft'

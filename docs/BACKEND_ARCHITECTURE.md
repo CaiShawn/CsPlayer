@@ -206,7 +206,7 @@ song:{id}:detail / :lyric / :url:{quality}
 
 另外两个工具函数：`parse_cookie_str`（`"a=1; b=2"` → dict）和 `merge_set_cookie`（把上游 `Set-Cookie` 合并进现有 cookie，处理刷新登录态）。**注意**：解析时会按 `COOKIE_ATTRS` 过滤 `Max-Age/Expires/Path` 等 Set-Cookie 属性——上游 cookie 字符串里混着它们，不能当成 cookie 收进来（历史上曾把 `Path=/wapi/feedback` 之类存进会话污染凭据）。
 
-规划中：`docs/V0.1.3_DESIGN.md` 计划把凭据改存浏览器 localStorage + `/api/auth/restore` 恢复会话（解决后端重启需重新扫码的问题；**尚未实现**）。
+规划中：`docs/V0.1.4_DESIGN.md` 计划把凭据改存浏览器 localStorage + `/api/auth/restore` 恢复会话（解决后端重启需重新扫码的问题；**尚未实现**）。
 
 #### `ncm_client.py` + `ncm_worker.py` — 网易云 SDK 子进程隔离（全项目最硬核的部分）
 
@@ -269,6 +269,14 @@ POST /api/auth/logout    → 上游登出 + 本地删会话 + 清缓存 + 清 Co
 - `get_lyric` + `parse_lrc_text`：**在后端就把 LRC 文本解析成结构化 `[{timeMs, text}]`**（支持一行多时间戳 `[00:10.00][01:20.00]副歌`、2/3 位小数毫秒），翻译歌词 `tlyric` 单独一列，前端只需按时间对齐渲染。无时间戳歌词降级为 `hasTime=False` 的纯文本行。
 - `song_detail`：单曲详情（缓存 300s）。
 
+#### `search_service.py` — 搜索 + 歌手只读页（v0.1.3）
+
+- `search`：统一搜索入口，`type` 分型（song/album/artist/playlist）→ cloudsearch 类型码（1/10/100/1000），响应统一 `{items, hasMore, total}`。优先走 SDK 通用 `request("/cloudsearch")`（比 `/search` 字段全：带封面、privilege），失败自动回退 SDK `search()`，两者响应结构 mappers 通吃。单曲额外按 `privilege` 标记不可播（无版权）。
+- **限流**：进程内滑动窗口（每用户每分钟 30 次；关键字 < 2 字视为“过短”，降到 6 次），超限返回 429 `rate_limited`，避免高频搜索触发上游风控。关键字空 / 超 60 字 / 类型非法 → 400 参数错误（与“无结果”明确区分）。
+- `artist_detail`：歌手只读页头部数据，`artists` 接口取歌手信息 + 热门 50 首；上游 404 映射为“歌手不存在”。
+- `artist_albums`：歌手专辑分页（`{items, hasMore, total}`，歌手页每页 30 张 + 「加载更多」），`total` 取 `artist.albumSize`、`hasMore` 取上游 `more`；按页缓存。
+- 缓存：搜索 60s（key 含 `kw+type+page`），歌手 300s。
+
 #### `mappers.py` — 防腐层
 
 上游返回的字段又乱又不统一（`al`/`album`、`ar`/`artists`、`dt`/`duration` 新旧字段并存），全部在 mapper 里做兼容转换，业务代码只见到干净的 DTO。**加新字段/新接口时改动都集中在这里。**
@@ -304,6 +312,14 @@ clear_session_cookie # 登出清 Cookie
 
 **一个安全设计**：`/song/{id}/url` 不把网易云的真实 CDN 地址返回浏览器（避免泄漏带签名的上游 URL），而是改写成 `"/api/stream/{id}?level=..."`，让音频走自己的代理。
 
+#### `search.py` — 搜索与歌手（需要登录）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/search?kw&type&limit&offset` | 综合搜索，type=song/album/artist/playlist |
+| GET | `/api/artist/{id}` | 歌手详情（信息 + 热门歌曲） |
+| GET | `/api/artist/{id}/albums?offset&limit` | 歌手专辑分页 |
+
 #### `stream.py` — 音频流代理（流式转发）
 
 ```
@@ -329,6 +345,8 @@ clear_session_cookie # 登出清 Cookie
 | 歌单列表/喜欢列表/liked_ids/收藏专辑 | 60s | `toggle_like` 时精确失效 |
 | 歌单详情/tracks | 120s | 同上（喜欢歌单的 tracks） |
 | 专辑详情 | 300s | 自然过期 |
+| 搜索结果 | 60s | 自然过期（key 含 kw+type+page） |
+| 歌手详情 | 300s | 自然过期 |
 | 歌曲 URL | 60s | 自然过期（上游本身短期有效） |
 | 歌词 | 3600s | 自然过期（歌词不变） |
 
@@ -385,6 +403,9 @@ main.py @app.exception_handler(Exception)   ← 兜底
 | GET | `/api/song/{id}/lyric` | ✓ | routers/song.py |
 | GET | `/api/song/{id}/detail` | ✓ | routers/song.py |
 | POST | `/api/song/{id}/like` | ✓ | routers/song.py |
+| GET | `/api/search` | ✓ | routers/search.py |
+| GET | `/api/artist/{id}` | ✓ | routers/search.py |
+| GET | `/api/artist/{id}/albums` | ✓ | routers/search.py |
 | GET | `/api/stream/{id}` | ✓ | routers/stream.py |
 
 启动：`cd backend && uvicorn app.main:app --reload --port 8000`（uvicorn 是 ASGI 服务器，负责跑 FastAPI 这个 ASGI 应用；`app.main:app` = `app/main.py` 里的 `app` 对象）。

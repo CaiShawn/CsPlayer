@@ -5,11 +5,14 @@ export { setUnauthorizedHandler, ApiError } from './client'
 import type {
   AlbumBrief,
   AlbumDetail,
+  ArtistDetail,
   LikeResult,
   LikedSongs,
   Lyric,
   PlaylistDetail,
   QrStatus,
+  SearchResult,
+  SearchType,
   SongUrl,
   QualityLevel,
   UserProfile,
@@ -55,4 +58,22 @@ export const songApi = {
   lyric: (id: number) => api.get<Lyric>(`/api/song/${id}/lyric`),
   like: (id: number, like: boolean) =>
     api.post<LikeResult>(`/api/song/${id}/like`, { like }),
+}
+
+export const searchApi = {
+  search: <T>(kw: string, type: SearchType, limit = 30, offset = 0) => {
+    const params = new URLSearchParams({
+      kw,
+      type,
+      limit: String(limit),
+      offset: String(offset),
+    })
+    return api.get<SearchResult<T>>(`/api/search?${params.toString()}`)
+  },
+  artist: (id: number) => api.get<ArtistDetail>(`/api/artist/${id}`),
+  /** 歌手专辑分页（歌手页每页 30 张 + 加载更多） */
+  artistAlbums: (id: number, offset = 0, limit = 30) => {
+    const params = new URLSearchParams({ offset: String(offset), limit: String(limit) })
+    return api.get<SearchResult<AlbumBrief>>(`/api/artist/${id}/albums?${params.toString()}`)
+  },
 }

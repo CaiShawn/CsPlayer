@@ -1,5 +1,10 @@
 import { create } from 'zustand'
 import {
+  defaultContextMenuPrefs,
+  normalizeContextMenu,
+} from '../contextMenu/defaults'
+import type { ContextKind, ContextMenuPrefs } from '../contextMenu/types'
+import {
   ACCENT_PRESETS,
   buildAccentPalette,
   presetPalette,
@@ -41,6 +46,8 @@ export interface Prefs {
   appearance: AppearancePrefs
   playback: PlaybackPrefs
   lyric: LyricPrefs
+  /** 右键菜单配置（独立 key 持久化：csplayer:prefs:contextMenu） */
+  contextMenu: ContextMenuPrefs
 }
 
 export const PREFS_VERSION = 1
@@ -48,6 +55,9 @@ export const PREFS_KEY = 'csplayer:prefs:main'
 export const PREFS_BACKUP_KEY = 'csplayer:prefs:backup'
 export const VOLUME_KEY = 'csplayer:prefs:volume'
 export const QUEUE_SESSION_KEY = 'csplayer:queue'
+/** 右键菜单配置独立存储（设计 §2.2），schema 损坏时回落默认布局 */
+export const CONTEXT_MENU_KEY = 'csplayer:prefs:contextMenu'
+export const CONTEXT_MENU_VERSION = 1
 
 export const DEFAULT_PREFS: Prefs = {
   appearance: {
@@ -67,6 +77,7 @@ export const DEFAULT_PREFS: Prefs = {
     showTranslation: true,
     highlightCurrent: true,
   },
+  contextMenu: defaultContextMenuPrefs(),
 }
 
 interface StoredPrefs extends Prefs {
@@ -78,33 +89,49 @@ function mergePrefs(raw: Partial<Prefs> | undefined): Prefs {
     appearance: { ...DEFAULT_PREFS.appearance, ...raw?.appearance },
     playback: { ...DEFAULT_PREFS.playback, ...raw?.playback },
     lyric: { ...DEFAULT_PREFS.lyric, ...raw?.lyric },
+    contextMenu: normalizeContextMenu(raw?.contextMenu),
+  }
+}
+
+/** 右键菜单配置独立读取：损坏 / 非法内容直接回落默认布局 */
+function readContextMenuPrefs(): ContextMenuPrefs {
+  try {
+    const raw = localStorage.getItem(CONTEXT_MENU_KEY)
+    if (!raw) return defaultContextMenuPrefs()
+    return normalizeContextMenu(JSON.parse(raw))
+  } catch {
+    return defaultContextMenuPrefs()
   }
 }
 
 /** 读取 prefs；版本不兼容 / 内容损坏时重置为默认并把旧内容备份到 PREFS_BACKUP_KEY。 */
 function loadPrefs(): Prefs {
+  const contextMenu = readContextMenuPrefs()
   try {
     const raw = localStorage.getItem(PREFS_KEY)
-    if (!raw) return { ...DEFAULT_PREFS }
+    if (!raw) return mergePrefs({ contextMenu })
     const parsed = JSON.parse(raw) as Partial<StoredPrefs>
     if (parsed.prefsVersion !== PREFS_VERSION) {
       localStorage.setItem(PREFS_BACKUP_KEY, raw)
-      localStorage.setItem(
-        PREFS_KEY,
-        JSON.stringify({ prefsVersion: PREFS_VERSION, ...DEFAULT_PREFS }),
-      )
-      return { ...DEFAULT_PREFS }
+      const restored = mergePrefs({ contextMenu })
+      savePrefs(restored)
+      return restored
     }
-    return mergePrefs(parsed)
+    return mergePrefs({ ...parsed, contextMenu })
   } catch {
     // storage 被禁用 / 内容损坏：静默降级为默认
-    return { ...DEFAULT_PREFS }
+    return mergePrefs({ contextMenu })
   }
 }
 
 function savePrefs(prefs: Prefs): void {
+  const { contextMenu, ...main } = prefs
   try {
-    localStorage.setItem(PREFS_KEY, JSON.stringify({ prefsVersion: PREFS_VERSION, ...prefs }))
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ prefsVersion: PREFS_VERSION, ...main }))
+    localStorage.setItem(
+      CONTEXT_MENU_KEY,
+      JSON.stringify({ version: CONTEXT_MENU_VERSION, ...contextMenu }),
+    )
   } catch {
     // ignore
   }
@@ -145,6 +172,12 @@ interface SettingsState {
   updateAppearance: (patch: Partial<AppearancePrefs>) => void
   updatePlayback: (patch: Partial<PlaybackPrefs>) => void
   updateLyric: (patch: Partial<LyricPrefs>) => void
+  /** 右键菜单：勾选显示 / 隐藏 */
+  toggleContextAction: (kind: ContextKind, id: string) => void
+  /** 右键菜单：拖拽排序（from/to 为 order 下标） */
+  moveContextAction: (kind: ContextKind, from: number, to: number) => void
+  /** 右键菜单：恢复默认布局（不传 kind = 全部对象类型） */
+  resetContextMenu: (kind?: ContextKind) => void
   /** 「恢复默认」：prefs 一键重置 */
   resetPrefs: () => void
   /** 「清除本地数据」：prefs / 备份 / 音量 / 队列快照一次清空（队列内存由调用方清） */
@@ -176,6 +209,47 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   updateLyric: (patch) => {
     const current = useSettingsStore.getState().prefs
     const prefs: Prefs = { ...current, lyric: { ...current.lyric, ...patch } }
+    savePrefs(prefs)
+    set({ prefs })
+  },
+
+  toggleContextAction: (kind, id) => {
+    const current = useSettingsStore.getState().prefs
+    const group = current.contextMenu[kind]
+    const hidden = group.hidden.includes(id)
+      ? group.hidden.filter((x) => x !== id)
+      : [...group.hidden, id]
+    const prefs: Prefs = {
+      ...current,
+      contextMenu: { ...current.contextMenu, [kind]: { ...group, hidden } },
+    }
+    savePrefs(prefs)
+    set({ prefs })
+  },
+
+  moveContextAction: (kind, from, to) => {
+    const current = useSettingsStore.getState().prefs
+    const group = current.contextMenu[kind]
+    const n = group.order.length
+    if (from === to || from < 0 || to < 0 || from >= n || to >= n) return
+    const order = [...group.order]
+    const [moved] = order.splice(from, 1)
+    order.splice(to, 0, moved)
+    const prefs: Prefs = {
+      ...current,
+      contextMenu: { ...current.contextMenu, [kind]: { ...group, order } },
+    }
+    savePrefs(prefs)
+    set({ prefs })
+  },
+
+  resetContextMenu: (kind) => {
+    const current = useSettingsStore.getState().prefs
+    const defaults = defaultContextMenuPrefs()
+    const contextMenu = kind
+      ? { ...current.contextMenu, [kind]: defaults[kind] }
+      : defaults
+    const prefs: Prefs = { ...current, contextMenu }
     savePrefs(prefs)
     set({ prefs })
   },

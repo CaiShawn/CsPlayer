@@ -23,6 +23,8 @@ class Settings:
             "user_likes": 60,
             "user_liked_ids": 60,
             "user_recent": 60,
+            "search": 60,
+            "artist_detail": 300,
         }
     )
     stream_referer: str = "https://music.163.com"

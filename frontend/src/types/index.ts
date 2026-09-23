@@ -85,6 +85,7 @@ export interface AlbumBrief {
   id: number
   name: string
   coverUrl: string
+  artistId: number
   artistName: string
   publishTime: number | null
   size: number
@@ -121,3 +122,37 @@ export interface RecordItem {
   playCount: number
   score: number
 }
+
+/* ------------------------------------------------------------------------
+ * 搜索 / 歌手（v0.1.3）
+ * --------------------------------------------------------------------- */
+
+export type SearchType = 'song' | 'album' | 'artist' | 'playlist'
+
+/** 统一搜索结果信封：{ items, hasMore, total } */
+export interface SearchResult<T = unknown> {
+  items: T[]
+  hasMore: boolean
+  total: number
+}
+
+export interface ArtistBrief {
+  id: number
+  name: string
+  avatarUrl: string
+  /** 别名，多个以 / 分隔 */
+  alias: string
+  musicSize: number
+  albumSize: number
+}
+
+export interface ArtistDetail {
+  id: number
+  name: string
+  avatarUrl: string
+  alias: string
+  briefDesc: string
+  hotSongs: SongSummary[]
+}
+
+/** 歌手专辑列表走分页接口，见 searchApi.artistAlbums */

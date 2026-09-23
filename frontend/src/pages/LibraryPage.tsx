@@ -5,6 +5,7 @@ import type { AlbumBrief, PlaylistBrief } from '../types'
 import { Cover } from '../components/common/Cover'
 import { Empty, Loading } from '../components/common/Ui'
 import { useAuthStore } from '../stores/authStore'
+import { useContextMenuStore } from '../stores/contextMenuStore'
 
 const PAGE_SIZE = 50
 
@@ -146,6 +147,9 @@ function PlaylistCard({ playlist }: { playlist: PlaylistBrief }) {
   return (
     <Link
       to={`/playlist/${playlist.id}`}
+      onContextMenu={(e) =>
+        useContextMenuStore.getState().openForEvent(e, { kind: 'playlist', playlist })
+      }
       className="group rounded-[var(--radius-cover)] border border-transparent bg-neutral-900/40 p-3 transition hover:border-neutral-800 hover:bg-neutral-900"
     >
       <Cover url={playlist.coverUrl} className="aspect-square w-full" />
@@ -162,6 +166,9 @@ function AlbumCard({ album }: { album: AlbumBrief }) {
   return (
     <Link
       to={`/album/${album.id}`}
+      onContextMenu={(e) =>
+        useContextMenuStore.getState().openForEvent(e, { kind: 'album', album })
+      }
       className="group rounded-[var(--radius-cover)] border border-transparent bg-neutral-900/40 p-3 transition hover:border-neutral-800 hover:bg-neutral-900"
     >
       <Cover url={album.coverUrl} className="aspect-square w-full" />

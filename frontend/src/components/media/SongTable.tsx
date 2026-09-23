@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useContextMenuStore } from '../../stores/contextMenuStore'
 import type { SongSummary } from '../../types'
 import { artistNames, formatDuration } from '../../utils/format'
 
@@ -11,6 +12,10 @@ interface Props {
   onToggleLike?: (song: SongSummary) => void
   extraHeader?: ReactNode
   extraCell?: (song: SongSummary, index: number) => ReactNode
+  /** 标题列最大宽度（px），默认 240 */
+  titleMaxWidth?: number
+  /** 时长列宽度（px），默认 64 */
+  durationWidth?: number
 }
 
 export function SongTable({
@@ -22,6 +27,8 @@ export function SongTable({
   onToggleLike,
   extraHeader,
   extraCell,
+  titleMaxWidth = 240,
+  durationWidth = 64,
 }: Props) {
   const showLike = !!onToggleLike
 
@@ -34,7 +41,12 @@ export function SongTable({
             <th className="px-3 py-[var(--space-row-y)] text-left font-medium">标题</th>
             <th className="px-3 py-[var(--space-row-y)] text-left font-medium">歌手</th>
             <th className="hidden px-3 py-[var(--space-row-y)] text-left font-medium md:table-cell">专辑</th>
-            <th className="w-16 px-3 py-[var(--space-row-y)] text-right font-medium">时长</th>
+            <th
+              style={{ width: durationWidth }}
+              className="px-3 py-[var(--space-row-y)] text-right font-medium"
+            >
+              时长
+            </th>
             {extraHeader}
             {showLike && <th className="w-12 px-3 py-[var(--space-row-y)] text-center font-medium">红心</th>}
           </tr>
@@ -48,6 +60,14 @@ export function SongTable({
               <tr
                 key={`${song.id}-${index}`}
                 onDoubleClick={() => !disabled && onPlay(index)}
+                onContextMenu={(e) =>
+                  useContextMenuStore.getState().openForEvent(e, {
+                    kind: 'song',
+                    song,
+                    songs: tracks,
+                    index,
+                  })
+                }
                 className={[
                   'cursor-pointer transition-colors',
                   active
@@ -63,7 +83,10 @@ export function SongTable({
                     index + 1
                   )}
                 </td>
-                <td className="max-w-[240px] truncate px-3 py-[var(--space-row-y)]">
+                <td
+                  style={{ maxWidth: titleMaxWidth }}
+                  className="truncate px-3 py-[var(--space-row-y)]"
+                >
                   <span className="text-neutral-100">{song.name}</span>
                   {disabled && (
                     <span className="ml-2 text-xs text-red-400">

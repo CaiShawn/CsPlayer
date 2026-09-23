@@ -5,6 +5,7 @@ import type { AlbumBrief } from '../types'
 import { Cover } from '../components/common/Cover'
 import { Empty, Loading } from '../components/common/Ui'
 import { useAuthStore } from '../stores/authStore'
+import { useContextMenuStore } from '../stores/contextMenuStore'
 
 const PAGE_SIZE = 50
 
@@ -71,6 +72,9 @@ export function ShelfPage() {
                 <Link
                   key={a.id}
                   to={`/album/${a.id}`}
+                  onContextMenu={(e) =>
+                    useContextMenuStore.getState().openForEvent(e, { kind: 'album', album: a })
+                  }
                   className="group rounded-[var(--radius-cover)] border border-transparent bg-neutral-900/40 p-3 transition hover:border-neutral-800 hover:bg-neutral-900"
                 >
                   <Cover url={a.coverUrl} className="aspect-square w-full" />

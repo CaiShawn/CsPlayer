@@ -6,12 +6,13 @@ from fastapi.responses import JSONResponse
 
 from .core.config import settings
 from .routers import auth as auth_router
+from .routers import search as search_router
 from .routers import song as song_router
 from .routers import stream as stream_router
 
 logger = logging.getLogger("csplayer.http")
 
-app = FastAPI(title="CsPlayer", version="0.1.1")
+app = FastAPI(title="CsPlayer", version="0.1.3")
 
 app.add_middleware(
     CORSMiddleware,
@@ -51,5 +52,6 @@ async def health():
 
 
 app.include_router(auth_router.router, prefix="/api/auth")
+app.include_router(search_router.router, prefix="/api")
 app.include_router(song_router.router, prefix="/api")
 app.include_router(stream_router.router, prefix="/api")

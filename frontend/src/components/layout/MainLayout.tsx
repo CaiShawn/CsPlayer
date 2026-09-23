@@ -4,6 +4,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { useLikesStore } from '../../stores/likesStore'
 import { usePlayerStore } from '../../stores/playerStore'
 import { useAudioEngine } from '../../hooks/useAudioEngine'
+import { ContextMenu } from '../common/ContextMenu'
 import { PlayerBar } from '../player/PlayerBar'
 import { QueuePanel } from '../player/QueuePanel'
 import { LyricPanel } from '../lyric/LyricPanel'
@@ -38,6 +39,8 @@ export function MainLayout() {
       </div>
       <PlayerBar />
       <QueuePanel />
+      {/* 全站唯一右键菜单实例（portal） */}
+      <ContextMenu />
       <Toast message={toast} onClose={() => setToast('')} />
     </div>
   )

@@ -49,6 +49,8 @@ interface PlayerState {
   currentSong: () => SongSummary | null
   playSongs: (list: SongSummary[], startIndex: number) => void
   enqueue: (list: SongSummary[]) => void
+  /** 「下一首播放」：插入到当前曲之后（不带去重，可重复插入） */
+  insertNext: (list: SongSummary[]) => void
   next: () => void
   prev: () => void
   togglePlay: () => void
@@ -222,6 +224,18 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const { queue } = get()
     const existing = new Set(queue.map((s) => s.id))
     const merged = [...queue, ...list.filter((s) => !existing.has(s.id))]
+    set({ queue: merged })
+  },
+
+  insertNext: (list) => {
+    if (!list.length) return
+    const { queue, currentIndex } = get()
+    if (currentIndex < 0 || queue.length === 0) {
+      set({ queue: [...queue, ...list] })
+      return
+    }
+    const merged = [...queue]
+    merged.splice(currentIndex + 1, 0, ...list)
     set({ queue: merged })
   },
 

@@ -14,6 +14,6 @@ export function formatTime(sec: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-export function artistNames(artists: { name: string }[]): string {
-  return artists.map((a) => a.name).join(' / ')
+export function artistNames(artists: { name: string }[] | undefined | null): string {
+  return (artists ?? []).map((a) => a.name).join(' / ')
 }

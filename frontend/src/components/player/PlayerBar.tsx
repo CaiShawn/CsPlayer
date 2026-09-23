@@ -1,3 +1,4 @@
+import { useContextMenuStore } from '../../stores/contextMenuStore'
 import { useLikesStore } from '../../stores/likesStore'
 import { usePlayerStore } from '../../stores/playerStore'
 import { artistNames } from '../../utils/format'
@@ -25,7 +26,19 @@ export function PlayerBar() {
     <div className="fixed bottom-0 left-0 right-0 z-40 h-20 border-t border-neutral-800 bg-neutral-950/95 backdrop-blur">
       <div className="mx-auto flex h-full max-w-screen-2xl items-center gap-4 px-4">
         {/* song info */}
-        <div className="flex min-w-0 w-56 items-center gap-3">
+        <div
+          className="flex min-w-0 w-56 items-center gap-3"
+          onContextMenu={(e) => {
+            if (song) {
+              useContextMenuStore.getState().openForEvent(e, {
+                kind: 'song',
+                song,
+                songs: queue,
+                index: currentIndex,
+              })
+            }
+          }}
+        >
           <Cover url={song?.coverUrl || ''} className="h-12 w-12 shrink-0" />
           <div className="min-w-0">
             <div className="truncate text-sm text-neutral-100">

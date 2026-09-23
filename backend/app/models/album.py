@@ -7,6 +7,7 @@ class AlbumBrief(BaseModel):
     id: int
     name: str
     coverUrl: str = ""
+    artistId: int = 0
     artistName: str = ""
     publishTime: int | None = None
     size: int = 0
