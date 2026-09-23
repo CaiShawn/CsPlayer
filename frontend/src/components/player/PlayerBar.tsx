@@ -64,7 +64,7 @@ export function PlayerBar() {
             <button
               type="button"
               onClick={togglePlay}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-neutral-950 hover:bg-emerald-400"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-neutral-950 hover:bg-accent-hover"
               title={playing ? '暂停' : '播放'}
             >
               {playing ? '⏸' : '▶'}
@@ -95,7 +95,7 @@ export function PlayerBar() {
                 ? 'text-neutral-700'
                 : lyricCollapsed
                   ? 'text-neutral-500 hover:text-neutral-100'
-                  : 'text-emerald-400 hover:text-emerald-300'
+                  : 'text-accent-text hover:text-accent-soft'
             }`}
           >
             词

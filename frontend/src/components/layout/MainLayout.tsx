@@ -31,7 +31,7 @@ export function MainLayout() {
       <TopBar />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <main className="min-w-0 flex-1 overflow-y-auto pb-24">
+        <main className="min-w-0 flex-1 overflow-y-auto pb-24 pl-2">
           <Outlet />
         </main>
         {showLyric && <LyricPanel />}
@@ -45,14 +45,14 @@ export function MainLayout() {
 
 function Sidebar() {
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-neutral-800 bg-neutral-950">
+    <aside className="flex w-[200px] shrink-0 flex-col border-r border-neutral-800 bg-neutral-950">
       <nav className="flex-1 space-y-1 px-3 py-4">
         <NavItem to="/home">首页</NavItem>
         <NavItem to="/like">我喜欢</NavItem>
-        <NavItem to="/record">听歌排行榜</NavItem>
         <NavItem to="/shelf">唱片架</NavItem>
         <div className="my-3 border-t border-neutral-800/80" />
         <NavItem to="/library">音乐库</NavItem>
+        <NavItem to="/record">自听榜</NavItem>
       </nav>
     </aside>
   )
@@ -65,7 +65,7 @@ function NavItem({ to, children }: { to: string; children: React.ReactNode }) {
       className={({ isActive }) =>
         `block rounded-lg px-3 py-2 text-sm transition-colors ${
           isActive
-            ? 'bg-emerald-500/15 text-emerald-300'
+            ? 'bg-accent/15 text-accent-soft'
             : 'text-neutral-400 hover:bg-neutral-900 hover:text-neutral-100'
         }`
       }

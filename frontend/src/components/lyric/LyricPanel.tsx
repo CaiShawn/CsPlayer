@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { usePlayerStore } from '../../stores/playerStore'
+import { useSettingsStore } from '../../stores/settingsStore'
 import { artistNames } from '../../utils/format'
 
 export function LyricPanel() {
@@ -7,7 +8,25 @@ export function LyricPanel() {
   const currentLyricIndex = usePlayerStore((s) => s.currentLyricIndex)
   const queue = usePlayerStore((s) => s.queue)
   const currentIndex = usePlayerStore((s) => s.currentIndex)
+  const lyricPrefs = useSettingsStore((s) => s.prefs.lyric)
   const listRef = useRef<HTMLDivElement>(null)
+
+  // 歌词偏好：字号 / 翻译 / 高亮
+  const sizeClass =
+    lyricPrefs.fontSize === 'sm'
+      ? 'text-sm'
+      : lyricPrefs.fontSize === 'lg'
+        ? 'text-lg'
+        : 'text-base'
+  const highlight = lyricPrefs.highlightCurrent
+  const showTrans = lyricPrefs.showTranslation
+  const transMap = useMemo(() => {
+    const m = new Map<number, string>()
+    for (const t of lyric.tlyric) {
+      if (t.text.trim()) m.set(t.timeMs, t.text)
+    }
+    return m
+  }, [lyric])
 
   const song = currentIndex >= 0 ? queue[currentIndex] : null
 
@@ -47,24 +66,33 @@ export function LyricPanel() {
         )}
         {!lyric.hasTime &&
           lyric.lrc.map((line, i) => (
-            <p key={i} className="mb-2 text-sm leading-6 text-neutral-400">
+            <p key={i} className={`mb-2 leading-6 text-neutral-400 ${sizeClass}`}>
               {line.text}
             </p>
           ))}
         {lyric.hasTime &&
-          lyric.lrc.map((line, i) => (
-            <p
-              key={i}
-              className={`mb-3 cursor-pointer text-sm leading-6 transition-colors ${
-                i === currentLyricIndex
-                  ? 'text-lg font-medium text-emerald-300'
-                  : 'text-neutral-500 hover:text-neutral-300'
-              }`}
-              onClick={() => usePlayerStore.getState().seek(line.timeMs / 1000)}
-            >
-              {line.text}
-            </p>
-          ))}
+          lyric.lrc.map((line, i) => {
+            const active = i === currentLyricIndex
+            const trans = showTrans ? transMap.get(line.timeMs) : undefined
+            return (
+              <p
+                key={i}
+                className={`mb-3 cursor-pointer leading-6 transition-colors ${sizeClass} ${
+                  highlight
+                    ? active
+                      ? 'font-medium text-accent-soft'
+                      : 'text-neutral-500 hover:text-neutral-300'
+                    : 'text-neutral-200 hover:text-neutral-100'
+                }`}
+                onClick={() => usePlayerStore.getState().seek(line.timeMs / 1000)}
+              >
+                {line.text}
+                {trans && (
+                  <span className="mt-0.5 block text-xs leading-4 text-neutral-500">{trans}</span>
+                )}
+              </p>
+            )
+          })}
       </div>
     </aside>
   )

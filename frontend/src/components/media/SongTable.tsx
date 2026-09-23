@@ -30,13 +30,13 @@ export function SongTable({
       <table className="w-full text-sm">
         <thead className="bg-neutral-900/80 text-neutral-400">
           <tr>
-            <th className="w-12 px-3 py-2 text-left font-medium">#</th>
-            <th className="px-3 py-2 text-left font-medium">标题</th>
-            <th className="px-3 py-2 text-left font-medium">歌手</th>
-            <th className="hidden px-3 py-2 text-left font-medium md:table-cell">专辑</th>
-            <th className="w-16 px-3 py-2 text-right font-medium">时长</th>
+            <th className="w-12 px-3 py-[var(--space-row-y)] text-left font-medium">#</th>
+            <th className="px-3 py-[var(--space-row-y)] text-left font-medium">标题</th>
+            <th className="px-3 py-[var(--space-row-y)] text-left font-medium">歌手</th>
+            <th className="hidden px-3 py-[var(--space-row-y)] text-left font-medium md:table-cell">专辑</th>
+            <th className="w-16 px-3 py-[var(--space-row-y)] text-right font-medium">时长</th>
             {extraHeader}
-            {showLike && <th className="w-12 px-3 py-2 text-center font-medium">红心</th>}
+            {showLike && <th className="w-12 px-3 py-[var(--space-row-y)] text-center font-medium">红心</th>}
           </tr>
         </thead>
         <tbody>
@@ -51,19 +51,19 @@ export function SongTable({
                 className={[
                   'cursor-pointer transition-colors',
                   active
-                    ? 'bg-emerald-500/10 text-emerald-300'
+                    ? 'bg-accent/10 text-accent-soft'
                     : 'hover:bg-neutral-800/60',
                   disabled ? 'opacity-40' : '',
                 ].join(' ')}
               >
-                <td className="px-3 py-2 text-neutral-500">
+                <td className="px-3 py-[var(--space-row-y)] text-neutral-500">
                   {active && playing ? (
-                    <span className="text-emerald-400">▶</span>
+                    <span className="text-accent-text">▶</span>
                   ) : (
                     index + 1
                   )}
                 </td>
-                <td className="max-w-[240px] truncate px-3 py-2">
+                <td className="max-w-[240px] truncate px-3 py-[var(--space-row-y)]">
                   <span className="text-neutral-100">{song.name}</span>
                   {disabled && (
                     <span className="ml-2 text-xs text-red-400">
@@ -71,18 +71,18 @@ export function SongTable({
                     </span>
                   )}
                 </td>
-                <td className="max-w-[140px] truncate px-3 py-2 text-neutral-400">
+                <td className="max-w-[140px] truncate px-3 py-[var(--space-row-y)] text-neutral-400">
                   {artistNames(song.artists)}
                 </td>
-                <td className="hidden max-w-[160px] truncate px-3 py-2 text-neutral-500 md:table-cell">
+                <td className="hidden max-w-[160px] truncate px-3 py-[var(--space-row-y)] text-neutral-500 md:table-cell">
                   {song.albumName}
                 </td>
-                <td className="px-3 py-2 text-right text-neutral-500">
+                <td className="px-3 py-[var(--space-row-y)] text-right text-neutral-500">
                   {formatDuration(song.durationMs)}
                 </td>
                 {extraCell?.(song, index)}
                 {showLike && (
-                  <td className="px-3 py-2 text-center">
+                  <td className="px-3 py-[var(--space-row-y)] text-center">
                     <button
                       type="button"
                       title={liked ? '取消喜欢' : '喜欢'}

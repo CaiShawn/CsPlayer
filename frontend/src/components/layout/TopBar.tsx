@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { usePlayerStore } from '../../stores/playerStore'
 import { SwitchAccountModal } from './SwitchAccountModal'
@@ -8,6 +8,8 @@ export function TopBar() {
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
   const navigate = useNavigate()
+  const location = useLocation()
+  const onSettings = location.pathname === '/settings'
   const [menuOpen, setMenuOpen] = useState(false)
   const [switchOpen, setSwitchOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -26,7 +28,7 @@ export function TopBar() {
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b border-neutral-800 bg-neutral-950 px-4">
       <div className="min-w-0 select-none">
-        <div className="text-base font-semibold tracking-wide text-emerald-400">CsPlayer</div>
+        <div className="text-base font-semibold tracking-wide text-accent-text">CsPlayer</div>
         <div className="truncate text-[10px] leading-3 text-neutral-500">
           Third-party web player for NCM
         </div>
@@ -95,6 +97,19 @@ export function TopBar() {
           </div>
         )}
       </div>
+
+      {/* 设置入口：顶栏右上角齿轮（与昵称并列） */}
+      <button
+        type="button"
+        title="设置"
+        aria-label="设置"
+        onClick={() => navigate('/settings')}
+        className={`flex h-8 w-8 items-center justify-center rounded-full text-base leading-none transition-colors hover:bg-neutral-900 ${
+          onSettings ? 'text-accent-text' : 'text-neutral-400 hover:text-neutral-100'
+        }`}
+      >
+        ⚙
+      </button>
 
       {switchOpen && <SwitchAccountModal onClose={() => setSwitchOpen(false)} />}
     </header>

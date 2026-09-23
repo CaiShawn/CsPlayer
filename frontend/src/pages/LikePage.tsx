@@ -55,7 +55,7 @@ export function LikePage() {
           type="button"
           onClick={playAll}
           disabled={!tracks.some((t) => t.playable)}
-          className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-medium text-neutral-950 hover:bg-emerald-400 disabled:opacity-40"
+          className="rounded-full bg-accent px-5 py-2 text-sm font-medium text-neutral-950 hover:bg-accent-hover disabled:opacity-40"
         >
           ▶ 播放全部
         </button>

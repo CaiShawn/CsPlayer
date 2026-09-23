@@ -2,6 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* 主题色（强调色）语义 token — RGB 三元组，供 Tailwind <alpha-value> 使用。
+     运行时由 stores/settingsStore.applyAppearance 覆写。 */
+  --color-accent: 16 185 129; /* 原 emerald-500：填充 / 边框 / accent-color */
+  --color-accent-text: 52 211 153; /* 原 emerald-400：强调文字 / 图标 */
+  --color-accent-soft: 110 231 183; /* 原 emerald-300：激活态文字 / hover */
+  --color-accent-hover: 52 211 153; /* hover / active 填充变体 */
+
+  /* 界面密度 / 封面圆角 */
+  --space-row-y: 0.5rem;
+  --space-card-gap: 1rem;
+  --radius-cover: 0.5rem;
+}
+
+html[data-density='compact'] {
+  --space-row-y: 0.25rem;
+  --space-card-gap: 0.75rem;
+}
+html[data-density='comfortable'] {
+  --space-row-y: 0.5rem;
+  --space-card-gap: 1rem;
+}
+html[data-cover-radius='none'] {
+  --radius-cover: 0rem;
+}
+html[data-cover-radius='md'] {
+  --radius-cover: 0.5rem;
+}
+html[data-cover-radius='lg'] {
+  --radius-cover: 1rem;
+}
+
 html,
 body,
 #root {

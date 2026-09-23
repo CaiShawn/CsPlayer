@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Lyric, PlayMode, QualityLevel, SongSummary } from '../types'
 import { findLyricIndex } from '../utils/lyric'
+import { QUEUE_SESSION_KEY, VOLUME_KEY, useSettingsStore } from './settingsStore'
 
 const emptyLyric: Lyric = { lrc: [], tlyric: [], hasTime: true }
 
@@ -69,6 +70,10 @@ interface PlayerState {
   toggleLyric: () => void
   setLyricCollapsed: (v: boolean) => void
   handleEnded: () => void
+  /** 不可播放曲目：按偏好跳过到下一首（单曲循环也向后推进，避免忙循环） */
+  skipUnplayable: () => void
+  /** 曲目加载成功，重置不可播连续计数 */
+  markPlayable: () => void
 }
 
 function randomIndex(n: number, exclude: number): number {
@@ -112,15 +117,78 @@ function prevIndex(state: PlayerState): number {
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * 播放偏好联动：记住音量（localStorage）、刷新后恢复队列（sessionStorage）
+ * ------------------------------------------------------------------------ */
+
+const VOLUME_DEFAULT = 0.8
+
+function initialVolume(): number {
+  try {
+    if (!useSettingsStore.getState().prefs.playback.rememberVolume) return VOLUME_DEFAULT
+    const v = Number(localStorage.getItem(VOLUME_KEY))
+    return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : VOLUME_DEFAULT
+  } catch {
+    return VOLUME_DEFAULT
+  }
+}
+
+interface QueueSession {
+  queue: SongSummary[]
+  currentIndex: number
+  quality: QualityLevel
+}
+
+function readQueueSession(): QueueSession | null {
+  try {
+    if (!useSettingsStore.getState().prefs.playback.restoreQueue) return null
+    const raw = sessionStorage.getItem(QUEUE_SESSION_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<QueueSession>
+    if (!Array.isArray(parsed.queue) || parsed.queue.length === 0) return null
+    const quality = QUALITY_LEVELS.includes(parsed.quality as QualityLevel)
+      ? (parsed.quality as QualityLevel)
+      : 'lossless'
+    const currentIndex =
+      typeof parsed.currentIndex === 'number'
+        ? Math.max(0, Math.min(parsed.currentIndex, parsed.queue.length - 1))
+        : 0
+    return { queue: parsed.queue, currentIndex, quality }
+  } catch {
+    return null
+  }
+}
+
+function writeQueueSession(): void {
+  try {
+    const s = usePlayerStore.getState()
+    if (!useSettingsStore.getState().prefs.playback.restoreQueue || s.queue.length === 0) {
+      sessionStorage.removeItem(QUEUE_SESSION_KEY)
+      return
+    }
+    sessionStorage.setItem(
+      QUEUE_SESSION_KEY,
+      JSON.stringify({ queue: s.queue, currentIndex: s.currentIndex, quality: s.quality }),
+    )
+  } catch {
+    // ignore
+  }
+}
+
+/** 连续不可播曲目数（整队不可播时止损，避免无限循环） */
+let unplayableStreak = 0
+
+const queueSession = readQueueSession()
+
 export const usePlayerStore = create<PlayerState>((set, get) => ({
-  queue: [],
-  currentIndex: -1,
+  queue: queueSession?.queue ?? [],
+  currentIndex: queueSession?.currentIndex ?? -1,
   playing: false,
   playMode: 'list-loop',
-  quality: 'lossless', // 默认 SQ（无损）
+  quality: queueSession?.quality ?? 'lossless', // 默认 SQ（无损）
   currentTime: 0,
   duration: 0,
-  volume: 0.8,
+  volume: initialVolume(),
   muted: false,
   lyric: emptyLyric,
   currentLyricIndex: -1,
@@ -135,6 +203,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   playSongs: (list, startIndex) => {
+    unplayableStreak = 0
     const tracks = list.length ? list : []
     const idx = Math.max(0, Math.min(startIndex, tracks.length - 1))
     set({
@@ -197,7 +266,17 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   seek: (sec) => set({ currentTime: sec }),
   setCurrentTime: (sec) => set({ currentTime: sec }),
   setDuration: (sec) => set({ duration: sec }),
-  setVolume: (v) => set({ volume: Math.max(0, Math.min(1, v)), muted: false }),
+  setVolume: (v) => {
+    const vol = Math.max(0, Math.min(1, v))
+    set({ volume: vol, muted: false })
+    if (useSettingsStore.getState().prefs.playback.rememberVolume) {
+      try {
+        localStorage.setItem(VOLUME_KEY, String(vol))
+      } catch {
+        // ignore
+      }
+    }
+  },
   toggleMute: () => set({ muted: !get().muted }),
 
   setPlayMode: (m) => set({ playMode: m }),
@@ -220,6 +299,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   jumpTo: (index) => {
     const { queue } = get()
     if (index < 0 || index >= queue.length) return
+    unplayableStreak = 0
     set({
       currentIndex: index,
       playing: true,
@@ -284,6 +364,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   handleEnded: () => {
     const s = get()
+    // 「自动续播下一首」关闭：播完停住
+    if (!useSettingsStore.getState().prefs.playback.autoNext) {
+      set({ playing: false, currentTime: 0 })
+      return
+    }
     if (s.playMode === 'single') {
       set({ currentTime: 0, playing: true, loadToken: s.loadToken + 1 })
       return
@@ -303,4 +388,46 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       loadToken: s.loadToken + 1,
     })
   },
+
+  skipUnplayable: () => {
+    const s = get()
+    const n = s.queue.length
+    unplayableStreak += 1
+    if (n === 0 || unplayableStreak > n) {
+      unplayableStreak = 0
+      set({ playing: false })
+      return
+    }
+    // 单曲循环下不可播也向后推进，避免忙循环
+    const idx = s.playMode === 'single' ? (s.currentIndex + 1) % n : nextIndex(s, true)
+    if (idx < 0 || idx === s.currentIndex) {
+      unplayableStreak = 0
+      set({ playing: false })
+      return
+    }
+    set({
+      currentIndex: idx,
+      playing: true,
+      currentTime: 0,
+      duration: 0,
+      lyric: emptyLyric,
+      currentLyricIndex: -1,
+      loadToken: s.loadToken + 1,
+    })
+  },
+
+  markPlayable: () => {
+    unplayableStreak = 0
+  },
 }))
+
+// 队列 / 进度 / 音质变化时写入 sessionStorage（受「刷新后恢复队列」开关控制）
+usePlayerStore.subscribe((state, prev) => {
+  if (
+    state.queue !== prev.queue ||
+    state.currentIndex !== prev.currentIndex ||
+    state.quality !== prev.quality
+  ) {
+    writeQueueSession()
+  }
+})

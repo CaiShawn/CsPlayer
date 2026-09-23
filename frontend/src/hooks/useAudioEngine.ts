@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { songApi } from '../api'
 import { useAuthStore } from '../stores/authStore'
+import { useLikesStore } from '../stores/likesStore'
 import { usePlayerStore } from '../stores/playerStore'
+import { useSettingsStore } from '../stores/settingsStore'
 
 /**
  * Singleton HTMLAudioElement bound to playerStore.
@@ -76,11 +78,18 @@ export function useAudioEngine() {
         ])
         if (cancelled) return
         if (!urlRes.playable || !urlRes.url) {
-          usePlayerStore.getState().setPlaying(false)
-          // try next track
-          usePlayerStore.getState().handleEnded()
+          // 「不可播放时」偏好：自动跳过 / 停止并提示
+          const st = usePlayerStore.getState()
+          st.setPlaying(false)
+          const action = useSettingsStore.getState().prefs.playback.unplayableAction
+          if (action === 'stop') {
+            useLikesStore.getState().setToast(`「${song.name}」不可播放，已停止`)
+          } else {
+            st.skipUnplayable()
+          }
           return
         }
+        usePlayerStore.getState().markPlayable()
         usePlayerStore.getState().setLyric(lyricRes)
         audio.src = urlRes.url
         audio.load()

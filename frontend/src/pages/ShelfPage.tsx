@@ -66,12 +66,12 @@ export function ShelfPage() {
           <Empty text="暂无收藏的专辑" />
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+            <div className="grid grid-cols-2 gap-[var(--space-card-gap)] sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
               {albums.map((a) => (
                 <Link
                   key={a.id}
                   to={`/album/${a.id}`}
-                  className="group rounded-xl border border-transparent bg-neutral-900/40 p-3 transition hover:border-neutral-800 hover:bg-neutral-900"
+                  className="group rounded-[var(--radius-cover)] border border-transparent bg-neutral-900/40 p-3 transition hover:border-neutral-800 hover:bg-neutral-900"
                 >
                   <Cover url={a.coverUrl} className="aspect-square w-full" />
                   <div className="mt-2 truncate text-sm text-neutral-100">{a.name}</div>
@@ -85,7 +85,7 @@ export function ShelfPage() {
                   type="button"
                   onClick={onLoadMore}
                   disabled={loadingMore}
-                  className="rounded-full border border-neutral-700 bg-neutral-900 px-6 py-2 text-sm text-neutral-200 hover:border-emerald-500/50 hover:text-emerald-300 disabled:opacity-50"
+                  className="rounded-full border border-neutral-700 bg-neutral-900 px-6 py-2 text-sm text-neutral-200 hover:border-accent/50 hover:text-accent-soft disabled:opacity-50"
                 >
                   {loadingMore ? '加载中…' : '加载更多'}
                 </button>

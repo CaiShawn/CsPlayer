@@ -112,7 +112,7 @@ export function LibraryPage() {
                   type="button"
                   onClick={onLoadMoreAlbums}
                   disabled={loadingMore}
-                  className="rounded-full border border-neutral-700 bg-neutral-900 px-6 py-2 text-sm text-neutral-200 hover:border-emerald-500/50 hover:text-emerald-300 disabled:opacity-50"
+                  className="rounded-full border border-neutral-700 bg-neutral-900 px-6 py-2 text-sm text-neutral-200 hover:border-accent/50 hover:text-accent-soft disabled:opacity-50"
                 >
                   {loadingMore ? '加载中…' : '加载更多'}
                 </button>
@@ -136,7 +136,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function CardGrid({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+    <div className="grid grid-cols-2 gap-[var(--space-card-gap)] sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
       {children}
     </div>
   )
@@ -146,7 +146,7 @@ function PlaylistCard({ playlist }: { playlist: PlaylistBrief }) {
   return (
     <Link
       to={`/playlist/${playlist.id}`}
-      className="group rounded-xl border border-transparent bg-neutral-900/40 p-3 transition hover:border-neutral-800 hover:bg-neutral-900"
+      className="group rounded-[var(--radius-cover)] border border-transparent bg-neutral-900/40 p-3 transition hover:border-neutral-800 hover:bg-neutral-900"
     >
       <Cover url={playlist.coverUrl} className="aspect-square w-full" />
       <div className="mt-2 truncate text-sm text-neutral-100">{playlist.name}</div>
@@ -162,7 +162,7 @@ function AlbumCard({ album }: { album: AlbumBrief }) {
   return (
     <Link
       to={`/album/${album.id}`}
-      className="group rounded-xl border border-transparent bg-neutral-900/40 p-3 transition hover:border-neutral-800 hover:bg-neutral-900"
+      className="group rounded-[var(--radius-cover)] border border-transparent bg-neutral-900/40 p-3 transition hover:border-neutral-800 hover:bg-neutral-900"
     >
       <Cover url={album.coverUrl} className="aspect-square w-full" />
       <div className="mt-2 truncate text-sm text-neutral-100">{album.name}</div>

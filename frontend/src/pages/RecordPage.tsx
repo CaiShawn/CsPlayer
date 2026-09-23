@@ -74,7 +74,7 @@ export function RecordPage() {
               onClick={() => setType('all')}
               className={`px-4 py-1.5 ${
                 type === 'all'
-                  ? 'bg-emerald-500 text-neutral-950'
+                  ? 'bg-accent text-neutral-950'
                   : 'text-neutral-300 hover:bg-neutral-900'
               }`}
             >
@@ -85,7 +85,7 @@ export function RecordPage() {
               onClick={() => setType('week')}
               className={`px-4 py-1.5 ${
                 type === 'week'
-                  ? 'bg-emerald-500 text-neutral-950'
+                  ? 'bg-accent text-neutral-950'
                   : 'text-neutral-300 hover:bg-neutral-900'
               }`}
             >
@@ -96,7 +96,7 @@ export function RecordPage() {
             type="button"
             onClick={playAll}
             disabled={!tracks.some((t) => t.playable)}
-            className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-medium text-neutral-950 hover:bg-emerald-400 disabled:opacity-40"
+            className="rounded-full bg-accent px-5 py-2 text-sm font-medium text-neutral-950 hover:bg-accent-hover disabled:opacity-40"
           >
             ▶ 播放全部
           </button>

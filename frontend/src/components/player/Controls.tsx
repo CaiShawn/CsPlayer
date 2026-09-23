@@ -21,7 +21,7 @@ export function ProgressBar() {
           const ratio = Number(e.target.value) / 1000
           if (duration > 0) seek(ratio * duration)
         }}
-        className="h-1 w-full cursor-pointer accent-emerald-500"
+        className="h-1 w-full cursor-pointer accent-[rgb(var(--color-accent))]"
       />
       <span className="w-10 tabular-nums">{formatTime(duration)}</span>
     </div>
@@ -50,7 +50,7 @@ export function VolumeControl() {
         max={100}
         value={muted ? 0 : Math.floor(volume * 100)}
         onChange={(e) => setVolume(Number(e.target.value) / 100)}
-        className="h-1 w-20 accent-emerald-500"
+        className="h-1 w-20 accent-[rgb(var(--color-accent))]"
       />
     </div>
   )
@@ -113,7 +113,7 @@ export function QualitySelector() {
               key={lv}
               type="button"
               className={`block w-full px-4 py-2 text-left text-sm hover:bg-neutral-800 ${
-                lv === quality ? 'text-emerald-400' : 'text-neutral-200'
+                lv === quality ? 'text-accent-text' : 'text-neutral-200'
               }`}
               onClick={() => {
                 setQuality(lv)

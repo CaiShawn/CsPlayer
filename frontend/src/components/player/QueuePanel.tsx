@@ -42,9 +42,9 @@ export function QueuePanel() {
           <div
             key={`${song.id}-${index}`}
             onDoubleClick={() => jumpTo(index)}
-            className={`group flex items-center gap-2 px-4 py-2 text-sm ${
+            className={`group flex items-center gap-2 px-4 py-[var(--space-row-y)] text-sm ${
               index === currentIndex
-                ? 'bg-emerald-500/10 text-emerald-300'
+                ? 'bg-accent/10 text-accent-soft'
                 : 'text-neutral-300 hover:bg-neutral-900'
             }`}
           >

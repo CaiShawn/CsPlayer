@@ -204,7 +204,7 @@ function DetailHeader({
         <button
           type="button"
           onClick={onPlayAll}
-          className="mt-5 rounded-full bg-emerald-500 px-5 py-2 text-sm font-medium text-neutral-950 hover:bg-emerald-400"
+          className="mt-5 rounded-full bg-accent px-5 py-2 text-sm font-medium text-neutral-950 hover:bg-accent-hover"
         >
           ▶ 播放全部
         </button>

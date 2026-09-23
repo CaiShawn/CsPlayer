@@ -8,7 +8,7 @@ interface Props {
 export function Cover({ url, alt = '', className = '', rounded = true }: Props) {
   return (
     <div
-      className={`relative overflow-hidden bg-neutral-800 ${rounded ? 'rounded-lg' : ''} ${className}`}
+      className={`relative overflow-hidden bg-neutral-800 ${rounded ? 'rounded-[var(--radius-cover)]' : ''} ${className}`}
     >
       {url ? (
         <img

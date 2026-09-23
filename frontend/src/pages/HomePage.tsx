@@ -32,12 +32,12 @@ export function HomePage() {
           <Link
             key={c.to}
             to={c.to}
-            className="group rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6 transition hover:border-emerald-500/40 hover:bg-neutral-900"
+            className="group rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6 transition hover:border-accent/40 hover:bg-neutral-900"
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/15 text-xl text-emerald-300">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/15 text-xl text-accent-soft">
               {c.icon}
             </div>
-            <div className="mt-4 text-lg font-semibold text-neutral-100 group-hover:text-emerald-300">
+            <div className="mt-4 text-lg font-semibold text-neutral-100 group-hover:text-accent-soft">
               {c.title}
             </div>
             <div className="mt-1 text-sm text-neutral-500">{c.desc}</div>

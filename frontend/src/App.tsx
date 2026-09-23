@@ -10,6 +10,7 @@ import { LikePage } from './pages/LikePage'
 import { RecordPage } from './pages/RecordPage'
 import { ShelfPage } from './pages/ShelfPage'
 import { LibraryPage } from './pages/LibraryPage'
+import { SettingsPage } from './pages/SettingsPage'
 import { AlbumPage, PlaylistPage } from './pages/DetailPages'
 import { Loading } from './components/common/Ui'
 
@@ -63,6 +64,7 @@ export default function App() {
         <Route path="record" element={<RecordPage />} />
         <Route path="shelf" element={<ShelfPage />} />
         <Route path="library" element={<LibraryPage />} />
+        <Route path="settings" element={<SettingsPage />} />
         <Route path="playlist/:id" element={<PlaylistPage />} />
         <Route path="album/:id" element={<AlbumPage />} />
       </Route>
