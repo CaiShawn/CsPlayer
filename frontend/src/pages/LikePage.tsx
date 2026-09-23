@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import type { SongSummary } from '../types'
-import { Empty, Loading } from '../components/common/Ui'
+import { Empty, LoadError, Loading } from '../components/common/Ui'
 import { SongTable } from '../components/media/SongTable'
 import { useAuthStore } from '../stores/authStore'
 import { useLikesStore } from '../stores/likesStore'
@@ -10,6 +10,7 @@ export function LikePage() {
   const dataVersion = useAuthStore((s) => s.dataVersion)
   const tracks = useLikesStore((s) => s.tracks)
   const tracksLoaded = useLikesStore((s) => s.tracksLoaded)
+  const tracksError = useLikesStore((s) => s.tracksError)
   const ids = useLikesStore((s) => s.ids)
   const fetchTracks = useLikesStore((s) => s.fetchTracks)
   const toggle = useLikesStore((s) => s.toggle)
@@ -63,6 +64,8 @@ export function LikePage() {
       <div className="mt-6">
         {!tracksLoaded ? (
           <Loading />
+        ) : tracksError ? (
+          <LoadError message={tracksError} onRetry={() => void fetchTracks()} />
         ) : tracks.length === 0 ? (
           <Empty text="暂无喜欢的歌曲" />
         ) : (

@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -6,6 +8,8 @@ from .core.config import settings
 from .routers import auth as auth_router
 from .routers import song as song_router
 from .routers import stream as stream_router
+
+logger = logging.getLogger("csplayer.http")
 
 app = FastAPI(title="CsPlayer", version="0.1.1")
 
@@ -34,6 +38,7 @@ async def http_error(request: Request, exc: HTTPException):
 
 @app.exception_handler(Exception)
 async def unhandled(request: Request, exc: Exception):
+    logger.error("未处理异常: %s %s", request.url.path, exc, exc_info=exc)
     return JSONResponse(
         status_code=500,
         content={"code": 5000, "message": "服务器内部错误", "data": None},

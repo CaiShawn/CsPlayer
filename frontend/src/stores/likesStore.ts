@@ -6,6 +6,7 @@ interface LikesState {
   ids: Set<number>
   tracks: SongSummary[]
   tracksLoaded: boolean
+  tracksError: string
   toast: string
   fetchIds: () => Promise<void>
   fetchTracks: () => Promise<void>
@@ -18,6 +19,7 @@ export const useLikesStore = create<LikesState>((set, get) => ({
   ids: new Set(),
   tracks: [],
   tracksLoaded: false,
+  tracksError: '',
   toast: '',
 
   fetchIds: async () => {
@@ -30,17 +32,21 @@ export const useLikesStore = create<LikesState>((set, get) => ({
   },
 
   fetchTracks: async () => {
+    set({ tracksLoaded: false, tracksError: '' })
     try {
       const data = await libraryApi.likes()
       const tracks = data.tracks || []
       set({
         tracks,
         tracksLoaded: true,
+        tracksError: '',
         ids: new Set(tracks.map((t) => t.id)),
       })
     } catch (e) {
-      set({ tracksLoaded: true })
-      set({ toast: e instanceof Error ? e.message : '加载我喜欢失败' })
+      set({
+        tracksLoaded: true,
+        tracksError: e instanceof Error ? e.message : '加载我喜欢失败',
+      })
     }
   },
 
@@ -75,5 +81,11 @@ export const useLikesStore = create<LikesState>((set, get) => ({
 
   setToast: (msg) => set({ toast: msg }),
   clear: () =>
-    set({ ids: new Set(), tracks: [], tracksLoaded: false, toast: '' }),
+    set({
+      ids: new Set(),
+      tracks: [],
+      tracksLoaded: false,
+      tracksError: '',
+      toast: '',
+    }),
 }))

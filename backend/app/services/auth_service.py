@@ -7,7 +7,7 @@ from ..core.cache import cache
 from ..core.config import settings
 from ..core.errors import bad_gateway, rate_limited, unauthorized
 from ..core.ncm_client import ncm_call
-from ..core.session import parse_cookie_str, sessions
+from ..core.session import COOKIE_ATTRS, parse_cookie_str, sessions
 from ..models.user import UserProfile
 from .mappers import map_user_profile
 
@@ -46,7 +46,10 @@ def _extract_cookies(resp) -> dict[str, str]:
         first = str(chunk).split(";")[0].strip()
         if "=" in first:
             k, v = first.split("=", 1)
-            cookie[k.strip()] = v.strip()
+            k = k.strip()
+            if k.lower() in COOKIE_ATTRS:
+                continue
+            cookie[k] = v.strip()
     return cookie
 
 

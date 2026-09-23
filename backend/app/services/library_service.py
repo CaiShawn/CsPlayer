@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from ..core.cache import cache
@@ -15,6 +16,40 @@ from .mappers import (
     map_song,
 )
 
+logger = logging.getLogger("csplayer.library")
+
+
+def _body_code(resp) -> Any:
+    body = resp.body
+    return body.get("code") if isinstance(body, dict) else None
+
+
+def _upstream_error(resp, what: str) -> Exception:
+    """把上游失败映射为用户可读异常；技术细节只进服务端日志。"""
+    status = resp.status
+    code = _body_code(resp)
+    logger.error("%s: status=%s body.code=%s", what, status, code)
+    if status == 301 or code == 301:
+        return unauthorized("登录已失效，请重新登录")
+    shown = code if code not in (None, 0, 200) else status
+    return bad_gateway(f"网易云接口暂时不可用（错误码 {shown}），请稍后重试")
+
+
+async def _ncm_get(fn_name: str, **kwargs: Any):
+    """只读 SDK 拉取：非 200 时重试一次，掩盖偶发崩溃/风控。
+    写操作（like / playlist_tracks）禁止使用，避免重复执行。"""
+    resp = await ncm_call(fn_name, **kwargs)
+    if resp.status == 200:
+        return resp
+    logger.warning(
+        "SDK %s 返回非 200: status=%s body.code=%s，重试一次",
+        fn_name,
+        resp.status,
+        _body_code(resp),
+    )
+    resp = await ncm_call(fn_name, **kwargs)
+    return resp
+
 
 async def user_playlists(cookie: dict, user_id: int) -> dict:
     key = f"user:{user_id}:playlists"
@@ -22,12 +57,12 @@ async def user_playlists(cookie: dict, user_id: int) -> dict:
     if cached:
         return cached
 
-    resp = await ncm_call(
+    resp = await _ncm_get(
         "user_playlist", cookie=cookie, uid=user_id, limit=100, offset=0
     )
     body = resp.body or {}
     if resp.status != 200:
-        raise bad_gateway("获取用户歌单失败")
+        raise _upstream_error(resp, f"获取用户歌单失败 uid={user_id}")
     playlist = body.get("playlist") or []
     created: list[PlaylistBrief] = []
     subscribed: list[PlaylistBrief] = []
@@ -58,15 +93,13 @@ async def user_albums(
         all_items: list[AlbumBrief] = []
         page_offset = 0
         while True:
-            resp = await ncm_call(
+            resp = await _ncm_get(
                 "album_sublist", cookie=cookie, limit=50, offset=page_offset
             )
             body = resp.body if isinstance(resp.body, dict) else {}
             code = int(body.get("code") or resp.status or 0)
-            if resp.status == 301 or code == 301:
-                raise unauthorized("登录已失效，请重新登录")
             if resp.status != 200 or code not in (200, 0):
-                raise bad_gateway("获取收藏专辑失败")
+                raise _upstream_error(resp, "获取收藏专辑失败")
             data = body.get("data")
             if not isinstance(data, list):
                 data = body.get("album")
@@ -105,13 +138,13 @@ async def playlist_detail(cookie: dict, playlist_id: int, user_id: int | None) -
     if cached:
         return PlaylistDetail(**cached)
 
-    meta_resp = await ncm_call("playlist_detail", cookie=cookie, id=playlist_id)
+    meta_resp = await _ncm_get("playlist_detail", cookie=cookie, id=playlist_id)
     meta_body = meta_resp.body or {}
     if meta_resp.status != 200:
-        raise bad_gateway("获取歌单详情失败")
+        raise _upstream_error(meta_resp, f"获取歌单详情失败 id={playlist_id}")
     meta = meta_body.get("playlist") or {}
     if not meta or not meta.get("id"):
-        raise not_found("歌单不存在")
+        raise not_found("歌单不存在或无权访问")
 
     tracks_raw = await _playlist_tracks(cookie, playlist_id)
     detail = map_playlist_detail(meta, tracks_raw, user_id)
@@ -127,9 +160,9 @@ async def _playlist_tracks(cookie: dict, playlist_id: int) -> list[dict]:
 
     all_tracks: list[dict] = []
     offset = 0
-    limit = 100
+    limit = 50  # 单页响应越小，SDK/QuickJS 大响应崩溃概率越低
     while True:
-        resp = await ncm_call(
+        resp = await _ncm_get(
             "playlist_track_all",
             cookie=cookie,
             id=playlist_id,
@@ -138,7 +171,9 @@ async def _playlist_tracks(cookie: dict, playlist_id: int) -> list[dict]:
         )
         body = resp.body or {}
         if resp.status != 200:
-            raise bad_gateway("获取歌单歌曲失败")
+            raise _upstream_error(
+                resp, f"获取歌单歌曲失败 id={playlist_id} offset={offset}"
+            )
         songs = body.get("songs") or []
         all_tracks.extend(s for s in songs if isinstance(s, dict))
         if len(songs) < limit:
@@ -157,10 +192,10 @@ async def album_detail(cookie: dict, album_id: int) -> AlbumDetail:
     if cached:
         return AlbumDetail(**cached)
 
-    resp = await ncm_call("album", cookie=cookie, id=album_id)
+    resp = await _ncm_get("album", cookie=cookie, id=album_id)
     body = resp.body or {}
     if resp.status != 200:
-        raise bad_gateway("获取专辑失败")
+        raise _upstream_error(resp, f"获取专辑失败 id={album_id}")
     album = body.get("album") or {}
     songs = body.get("songs") or []
     if not album or not album.get("id"):
@@ -184,10 +219,10 @@ async def liked_playlist_id(cookie: dict, user_id: int) -> int:
     if cached:
         return int(cached)
 
-    resp = await ncm_call("user_playlist", cookie=cookie, uid=user_id, limit=20, offset=0)
+    resp = await _ncm_get("user_playlist", cookie=cookie, uid=user_id, limit=20, offset=0)
     body = resp.body or {}
     if resp.status != 200:
-        raise bad_gateway("获取用户歌单失败")
+        raise _upstream_error(resp, f"获取用户歌单失败(liked_playlist_id) uid={user_id}")
     for raw in body.get("playlist") or []:
         if isinstance(raw, dict) and _is_liked_playlist(raw):
             pid = int(raw.get("id") or 0)
@@ -203,10 +238,10 @@ async def user_liked_ids(cookie: dict, user_id: int) -> list[int]:
     if cached is not None:
         return cached
 
-    resp = await ncm_call("likelist", cookie=cookie, uid=user_id)
+    resp = await _ncm_get("likelist", cookie=cookie, uid=user_id)
     body = resp.body or {}
     if resp.status != 200:
-        raise bad_gateway("获取喜欢列表失败")
+        raise _upstream_error(resp, f"获取喜欢列表失败 uid={user_id}")
     ids = body.get("ids") or []
     result = [int(i) for i in ids if i is not None]
     cache.set(key, result, settings.cache_ttl["user_liked_ids"])
@@ -248,10 +283,12 @@ async def user_record_rank(
     if cached is not None:
         return [RecordItem(**s) for s in cached]
 
-    resp = await ncm_call("user_record", cookie=cookie, uid=user_id, type=ncm_type)
+    resp = await _ncm_get("user_record", cookie=cookie, uid=user_id, type=ncm_type)
     body = resp.body or {}
     if resp.status != 200:
-        raise bad_gateway("获取听歌排行失败")
+        raise _upstream_error(
+            resp, f"获取听歌排行失败 uid={user_id} type={ncm_type}"
+        )
 
     if ncm_type == 1:
         raw_list = body.get("weekData") or body.get("allData") or []
@@ -310,7 +347,7 @@ async def toggle_like(cookie: dict, user_id: int, song_id: int, like: bool) -> L
         body2 = resp2.body or {}
         code2 = int(body2.get("code") or resp2.status or 0)
         if resp2.status != 200 or code2 not in (200, 0):
-            raise bad_gateway("更新喜欢状态失败")
+            raise _upstream_error(resp2, f"更新喜欢状态失败 id={song_id}")
 
     await _invalidate_like_cache(cookie, user_id, song_id)
     return LikeResult(id=song_id, liked=like)

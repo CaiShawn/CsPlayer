@@ -39,6 +39,22 @@ class SessionStore:
 sessions = SessionStore()
 
 
+# Set-Cookie / cookie 字符串里的属性名，不是真正的 cookie，解析时跳过
+COOKIE_ATTRS = {
+    "max-age",
+    "expires",
+    "path",
+    "domain",
+    "secure",
+    "httponly",
+    "samesite",
+    "priority",
+    "version",
+    "comment",
+    "upgrade",
+}
+
+
 def parse_cookie_str(raw: str) -> dict[str, str]:
     result: dict[str, str] = {}
     if not raw:
@@ -47,7 +63,10 @@ def parse_cookie_str(raw: str) -> dict[str, str]:
         part = part.strip()
         if "=" in part:
             k, v = part.split("=", 1)
-            result[k.strip()] = v.strip()
+            k = k.strip()
+            if k.lower() in COOKIE_ATTRS:
+                continue
+            result[k] = v.strip()
     return result
 
 

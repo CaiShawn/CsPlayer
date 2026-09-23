@@ -49,7 +49,58 @@ MusicLibrary: NeteaseCloudMusicApi.record_recent_song(cookie={...登录态...})
 
 ---
 
-## 2026-06 · SDK 生命周期残留风险与隔离方案（记录，暂不实施）
+## 2026-06 · 歌单/我喜欢 偶发 502 排查与子进程隔离落地（本节取代下文「隔离方案暂不实施」的决策）
+
+### 现象
+
+1. 访问「我喜欢」/歌单详情（`/playlist/detail` + `/playlist/track/all`）高概率 502；失败点会漂移（有时挂在 detail 一步、有时挂在 track/all），同一调用单独复现又正常。
+2. 加了服务端日志后抓到真实原因：
+   ```text
+   [ROUTE] route: /playlist/detail, ... params: {"id":563383913}
+   SDK 调用疑似原生崩溃: playlist_detail (第 1 次尝试): exception: access violation writing 0xFFFFFFFFFFFFFFF9
+   Registering environment variables: ...   ← 同实例重试开始
+   （随后整个 uvicorn 进程硬崩）
+   ```
+3. 实验证伪了两种进程内缓解：
+   - **重建实例**（旧方案）：崩溃后 `_reset_api()` + 新 `NeteaseCloudMusicApi()` 会二次 `ncm_init`，在已污染的堆上**必崩**（`_NcmContextManager.get_ctx()` 首次调用后 `_ctx=None`，新实例构造会再走 `ncm_init`）。
+   - **同实例重试**（本次先行修复）：access violation 是野生内存写，异常被 ctypes 包成 OSError 抛出时堆已写坏；重试再次进入原生代码 → **进程硬崩**，try/except 拦不住。
+
+### 结论
+
+- **进程内无法可靠防护原生崩溃**：try/except 只能接到崩溃的“回声”（异常），接不到崩溃本身（堆损坏/硬崩）。
+- **唯一硬保证是 OS 进程边界**：SDK 必须运行在可丢弃的子进程里；崩溃只死子进程，主进程换新进程继续服务。
+- 崩溃后**任何进程内重试都是危险操作**；重试只能在“全新子进程”（干净的堆）里做。
+
+### 实施：子进程隔离 Worker（替代上文「同进程策略」决策）
+
+```text
+FastAPI 主进程（永不 import MusicLibrary 原生层）
+  └─ ncm_client（RPC 客户端，单线程 executor 串行）
+       └─ multiprocessing.Pipe（二进制 pickle；不走 stdio——SDK 会往 stdout 打噪声）
+            └─ ncm_worker 子进程（唯一持有 SDK/QuickJS，可随时丢弃重建）
+```
+
+协议与行为：
+
+1. 请求 `{"fn", "cookie", "kwargs"}` → 响应 `{"ok": true, "status", "headers", "body"}` / `{"ok": false, "crashed", "error"}`。
+2. worker 内异常分类：`OSError` / `access violation` → `crashed=true` 且回包后**自杀退出**（堆不可信，绝不再接下一个请求）；非原生异常 → 报错但继续服务。
+3. 主进程崩溃检测：管道 EOF / 进程退出 / 30s 超时 → 丢弃 worker → **在全新 worker 中重试一次** → 仍失败则 502「音乐服务内部错误，请重试」。
+4. 熔断：连续崩溃 ≥3 次 → 退避 30s，期间直接 502「音乐服务连续崩溃，请稍后重试」。
+5. 重建 = 新 OS 进程 = 干净堆，不再触碰进程内重试/`ncm_init` 重建等危险路径。
+
+对应改动：`app/core/ncm_worker.py`（新增）、`app/core/ncm_client.py`（重写为 RPC 客户端）；`ncm_call` 对外签名不变，服务层零改动。
+
+### 复现备忘
+
+```text
+playlist_detail(563383913) 登录态调用偶发
+  exception: access violation writing 0xFFFFFFFFFFFFFFF9（地址每次不同，含野生高位地址）
+崩溃后同进程内继续调用 → 进程硬崩（无 traceback，uvicorn worker 直接消失）
+直接以独立进程单次调用同一接口 → 正常返回（故响应解析/映射层无罪）
+```
+
+
+## 2026-06 · SDK 生命周期残留风险与隔离方案（记录，暂不实施 → 已实施，见上节）
 
 ### 现状约束
 

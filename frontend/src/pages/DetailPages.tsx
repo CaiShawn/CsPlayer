@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { libraryApi } from '../api'
 import type { PlaylistDetail, SongSummary } from '../types'
 import { Cover } from '../components/common/Cover'
-import { Empty, Loading } from '../components/common/Ui'
+import { Empty, LoadError, Loading } from '../components/common/Ui'
 import { SongTable } from '../components/media/SongTable'
 import { useAuthStore } from '../stores/authStore'
 import { useLikesStore } from '../stores/likesStore'
@@ -17,6 +17,7 @@ export function PlaylistPage() {
   const [detail, setDetail] = useState<PlaylistDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [reload, setReload] = useState(0)
 
   const currentId = usePlayerStore((s) =>
     s.currentIndex >= 0 ? s.queue[s.currentIndex]?.id : undefined,
@@ -41,10 +42,11 @@ export function PlaylistPage() {
     return () => {
       cancelled = true
     }
-  }, [id, dataVersion])
+  }, [id, dataVersion, reload])
 
   if (loading) return <Loading />
-  if (error) return <div className="p-8 text-center text-sm text-red-400">{error}</div>
+  if (error)
+    return <LoadError message={error} onRetry={() => setReload((n) => n + 1)} />
   if (!detail) return <Empty text="歌单不存在" />
 
   const playAll = () => {
