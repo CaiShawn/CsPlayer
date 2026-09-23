@@ -3,7 +3,7 @@
 SDK 运行在可丢弃的子进程 worker（app/core/ncm_worker.py）里：
 原生崩溃（access violation 等）只死子进程，主进程丢弃它、拉起全新 worker
 （干净的堆）并在其中重试一次；仍失败则返回可读 502。
-FastAPI 进程永不崩溃。详见 docs/DEBUG.md（2026-06 子进程隔离落地）。
+FastAPI 进程永不崩溃。详见 docs/archived/DEBUG.md（2026-06 子进程隔离落地）。
 
 注意：进程内任何「崩溃后重试/重建实例」都是危险操作（堆已损坏，二次
 ncm_init 必崩），本模块是唯一的重试边界——重试永远发生在新 OS 进程里。

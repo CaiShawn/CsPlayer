@@ -2,7 +2,7 @@
 
 本进程是唯一持有 MusicLibrary / QuickJS / engine.dll 的地方。
 原生崩溃（access violation 等）只杀死本进程；主进程经 Pipe 检测到后
-自动重启一个全新 worker，FastAPI 进程永不崩溃。详见 docs/DEBUG.md
+自动重启一个全新 worker，FastAPI 进程永不崩溃。详见 docs/archived/DEBUG.md
 （2026-06 · 歌单/我喜欢 偶发 502 排查与子进程隔离落地）。
 
 协议（multiprocessing.Pipe，二进制 pickle；不走 stdio——SDK 会往 stdout 打噪声）：

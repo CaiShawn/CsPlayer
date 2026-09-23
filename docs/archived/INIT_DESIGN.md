@@ -49,7 +49,7 @@ CsPlayer/
 ├── README.md
 ├── docs/
 │   ├── INIT_DESIGN.md          # 本文档
-│   ├── V0.1.1_DESIGN.md
+│   ├── archived/               # 归档：V0.1.1_DESIGN.md · V0.1.2_DESIGN.md
 │   └── SDK参考文档.md
 ├── backend/
 │   ├── requirements.txt

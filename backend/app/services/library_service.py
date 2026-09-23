@@ -274,7 +274,7 @@ async def user_record_rank(
     """听歌排行榜。type=all → allData；type=week → weekData。
 
     注意：真正的「最近播放」需 /record/recent/song，当前 SDK 登录态会原生崩溃，
-    详见 docs/DEBUG.md。本接口仅使用稳定的 user_record。
+    详见 docs/archived/DEBUG.md。本接口仅使用稳定的 user_record。
     """
     limit = max(1, min(int(limit or 50), 100))
     ncm_type = 1 if type == "week" else 0

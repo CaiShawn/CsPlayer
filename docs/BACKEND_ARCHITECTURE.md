@@ -210,7 +210,7 @@ song:{id}:detail / :lyric / :url:{quality}
 
 #### `ncm_client.py` + `ncm_worker.py` — 网易云 SDK 子进程隔离（全项目最硬核的部分）
 
-背景：`pymusiclibrary` 是 QuickJS 的 Python 绑定，调用网易云 API 的 JS 实现。它有两个致命特性：**非线程安全**；**原生崩溃会毒化进程**——access violation 是野生内存写，ctypes 把它包成 OSError 抛出时堆已经写坏，此后同一进程内任何原生调用（重试、重建实例、二次 `ncm_init`）都可能直接把 Python 进程带崩，try/except 拦不住（完整实锤见 `docs/DEBUG.md`）。
+背景：`pymusiclibrary` 是 QuickJS 的 Python 绑定，调用网易云 API 的 JS 实现。它有两个致命特性：**非线程安全**；**原生崩溃会毒化进程**——access violation 是野生内存写，ctypes 把它包成 OSError 抛出时堆已经写坏，此后同一进程内任何原生调用（重试、重建实例、二次 `ncm_init`）都可能直接把 Python 进程带崩，try/except 拦不住（完整实锤见 `docs/archived/DEBUG.md`）。
 
 结论：**进程内无解，隔离边界必须是 OS 进程**。因此 SDK 只活在可丢弃的子进程 worker 里：
 
@@ -260,7 +260,7 @@ POST /api/auth/logout    → 上游登出 + 本地删会话 + 清缓存 + 清 Co
 - `liked_playlist_id`：识别"我喜欢的音乐"歌单——`specialType == 5` 或名字匹配 `我喜欢的音乐`。
 - `user_liked_ids` / `user_likes`：已喜欢的歌曲 id 集合（用于列表心形图标）和完整列表。
 - `toggle_like`：**双保险**——先调 `like` 接口；失败回退到对"我喜欢的音乐"歌单 `playlist_tracks(op=add/del)` 增删曲。成功后调 `_invalidate_like_cache` 精确失效相关缓存（likes、liked_ids、playlists、该曲 detail、该歌单 tracks/detail）。
-- `user_record_rank`：听歌排行（all/week）。注意 docstring 说明：**这不是"最近播放"**，真正的最近播放接口 `record_recent_song` 带登录态会触发原生崩溃，已搁置（详见 `docs/DEBUG.md`）。
+- `user_record_rank`：听歌排行（all/week）。注意 docstring 说明：**这不是"最近播放"**，真正的最近播放接口 `record_recent_song` 带登录态会触发原生崩溃，已搁置（详见 `docs/archived/DEBUG.md`）。
 - **容错约定**（本层所有只读 SDK 拉取走 `_ncm_get`）：上游偶发非 200 自动重试一次；最终失败经 `_upstream_error` 翻译成用户可读错误（301→"登录已失效"，其余→"网易云接口暂时不可用（错误码 xxx）"），status/`body.code` 等技术细节只进服务端日志。写操作（`like`/`playlist_tracks`）不重试，避免重复执行。
 
 #### `music_service.py` — 播放相关
@@ -401,7 +401,7 @@ main.py @app.exception_handler(Exception)   ← 兜底
 | 调缓存时长 | `core/config.py` 的 `cache_ttl` |
 | 字段/返回结构不一致 | 先看 `mappers.py`（新旧字段兼容都在这） |
 | 改登录方式（手机号等） | `services/auth_service.py` + `routers/auth.py`，会话部分不用动 |
-| SDK 崩溃 / access violation | 崩溃已被 worker 隔离（自动重启），一般只需前端点「重试」；排查看 `docs/DEBUG.md`。**禁止**进程内重试 / 重建实例 / 调用 `destroy()`（会在坏堆上二次崩） |
+| SDK 崩溃 / access violation | 崩溃已被 worker 隔离（自动重启），一般只需前端点「重试」；排查看 `docs/archived/DEBUG.md`。**禁止**进程内重试 / 重建实例 / 调用 `destroy()`（会在坏堆上二次崩） |
 | 需要持久化会话/缓存 | 只需替换 `core/session.py` / `core/cache.py` 的内部实现（接口保持不变） |
 
 ---
@@ -410,6 +410,6 @@ main.py @app.exception_handler(Exception)   ← 兜底
 
 1. **全内存状态**（会话、缓存）：重启掉线、缓存清空；多进程部署会话不共享（也因此 uvicorn 只跑单进程）。
 2. **SDK 串行调用 + worker 单点**：所有网易云请求排队进单个 worker，一个慢请求会拖慢后面的（用缓存缓解）；worker 崩溃后重建有 1~2s 冷启动，反复崩会触发 30s 熔断退避（期间返回可读 502，但服务不崩）。
-3. **"最近播放"缺失**：`user_record` 实为听歌排行；真正的最近播放接口带登录态触发 SDK 原生崩溃，已搁置（`docs/DEBUG.md` 有完整排查记录）。
+3. **"最近播放"缺失**：`user_record` 实为听歌排行；真正的最近播放接口带登录态触发 SDK 原生崩溃，已搁置（`docs/archived/DEBUG.md` 有完整排查记录）。
 4. **无请求日志/指标**、无 CSRF token（靠 SameSite=Lax 缓解）、CORS 白名单写死在配置里。
 5. `routers/user.py` 是空壳占位文件，用户相关接口实际在 `song.py`（历史合并结果）。
