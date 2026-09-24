@@ -1,23 +1,21 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { libraryApi } from '../api'
-import type { AlbumBrief, PlaylistBrief } from '../types'
+import type { PlaylistBrief } from '../types'
 import { Cover } from '../components/common/Cover'
 import { CardGridSkeleton, Empty, ErrorBar } from '../components/common/Ui'
 import { useAuthStore } from '../stores/authStore'
 import { useContextMenuStore } from '../stores/contextMenuStore'
 
-const PAGE_SIZE = 50
-
 interface LibraryData {
   created: PlaylistBrief[]
   subscribed: PlaylistBrief[]
-  albums: AlbumBrief[]
-  hasMore: boolean
 }
 
 /** SWR 内存快照（§4.3 a）：二次进入立即渲染缓存内容（<100ms），后台静默刷新；
- *  按 authStore.dataVersion 归属，切账号不串数据。 */
+ *  按 authStore.dataVersion 归属，切账号不串数据。
+ *  v0.1.7：收藏的专辑改由唱片架展示（滚动分批加载），音乐库只留跳转入口，
+ *  不再重复加载专辑。 */
 let snapshot: { version: number; data: LibraryData } | null = null
 
 export function LibraryPage() {
@@ -26,7 +24,6 @@ export function LibraryPage() {
   const [data, setData] = useState<LibraryData | null>(cached)
   const [loading, setLoading] = useState(!cached)
   const [error, setError] = useState('')
-  const [loadingMore, setLoadingMore] = useState(false)
   const [reloadTick, setReloadTick] = useState(0)
 
   const load = useCallback(async () => {
@@ -39,22 +36,10 @@ export function LibraryPage() {
     }
     setError('')
     try {
-      const [pl, al] = await Promise.all([
-        libraryApi.playlists(),
-        libraryApi.albums(0, PAGE_SIZE),
-      ])
-      const first = al.items || []
-      // 静默刷新保留用户已「加载更多」的尾部专辑（分页由用户驱动，避免闪烁/丢滚动位置）
-      const tail =
-        warm && warm.albums.length > first.length
-          ? warm.albums.slice(first.length)
-          : []
-      const headIds = new Set(first.map((a) => a.id))
+      const pl = await libraryApi.playlists()
       const next: LibraryData = {
         created: pl.created || [],
         subscribed: pl.subscribed || [],
-        albums: [...first, ...tail.filter((a) => !headIds.has(a.id))],
-        hasMore: !!al.hasMore,
       }
       snapshot = { version: dataVersion, data: next }
       setData(next)
@@ -70,28 +55,6 @@ export function LibraryPage() {
   useEffect(() => {
     void load()
   }, [load, reloadTick])
-
-  const onLoadMoreAlbums = async () => {
-    if (!data || loadingMore || !data.hasMore) return
-    setLoadingMore(true)
-    try {
-      const al = await libraryApi.albums(data.albums.length, PAGE_SIZE)
-      setData((prev) => {
-        if (!prev) return prev
-        const next: LibraryData = {
-          ...prev,
-          albums: [...prev.albums, ...(al.items || [])],
-          hasMore: !!al.hasMore,
-        }
-        if (snapshot?.version === dataVersion) snapshot = { version: dataVersion, data: next }
-        return next
-      })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败')
-    } finally {
-      setLoadingMore(false)
-    }
-  }
 
   if (loading) return <LibrarySkeleton />
   if (!data) {
@@ -137,30 +100,11 @@ export function LibraryPage() {
         )}
       </Section>
 
+      {/* 收藏的专辑统一在唱片架展示（滚动分批加载），这里只留跳转入口 */}
       <Section title="收藏的专辑">
-        {data.albums.length === 0 ? (
-          <Empty text="暂无收藏的专辑" />
-        ) : (
-          <>
-            <CardGrid>
-              {data.albums.map((a) => (
-                <AlbumCard key={a.id} album={a} />
-              ))}
-            </CardGrid>
-            {data.hasMore && (
-              <div className="mt-6 flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => void onLoadMoreAlbums()}
-                  disabled={loadingMore}
-                  className="rounded-full border border-neutral-700 bg-neutral-900 px-6 py-2 text-sm text-neutral-200 hover:border-accent/50 hover:text-accent-soft disabled:opacity-50"
-                >
-                  {loadingMore ? '加载中…' : '加载更多'}
-                </button>
-              </div>
-            )}
-          </>
-        )}
+        <CardGrid>
+          <ShelfLinkCard />
+        </CardGrid>
       </Section>
     </div>
   )
@@ -216,18 +160,18 @@ function PlaylistCard({ playlist }: { playlist: PlaylistBrief }) {
   )
 }
 
-function AlbumCard({ album }: { album: AlbumBrief }) {
+/** 「收藏的专辑」入口卡：点击跳唱片架（专辑在那边分批加载，不在此重复请求） */
+function ShelfLinkCard() {
   return (
     <Link
-      to={`/album/${album.id}`}
-      onContextMenu={(e) =>
-        useContextMenuStore.getState().openForEvent(e, { kind: 'album', album })
-      }
+      to="/shelf"
       className="group rounded-[var(--radius-cover)] border border-transparent bg-neutral-900/40 p-3 transition hover:border-neutral-800 hover:bg-neutral-900"
     >
-      <Cover url={album.coverUrl} className="aspect-square w-full" />
-      <div className="mt-2 truncate text-sm text-neutral-100">{album.name}</div>
-      <div className="mt-0.5 truncate text-xs text-neutral-500">{album.artistName}</div>
+      <div className="flex aspect-square w-full items-center justify-center rounded-[var(--radius-cover)] bg-neutral-800/70 text-4xl text-neutral-500 transition group-hover:text-accent-soft">
+        ♫
+      </div>
+      <div className="mt-2 truncate text-sm text-neutral-100">查看全部收藏专辑</div>
+      <div className="mt-0.5 text-xs text-neutral-500">前往唱片架 →</div>
     </Link>
   )
 }
