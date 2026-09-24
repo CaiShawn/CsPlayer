@@ -10,6 +10,15 @@
 
 ## 魔改网抑云，启动！
 
+> [!IMPORTANT]
+> **平台要求：仅支持 Windows** —— 后端 SDK 仅提供 Windows 原生库，Linux / macOS 暂不可用，详见 `docs/docker/`。
+>
+> **安装环境**：Python 3.11+、Node.js 18+（含 npm）；依赖由启动脚本自动安装（后端 `pip install -r requirements.txt`、前端 `npm install`），手动启动则自行先装。
+
+**一键启动**：双击 `start.bat`（或 PowerShell 里 `.\start.ps1`）——自动装依赖，后端 / 前端各开一个终端窗口，就绪后自动打开浏览器。
+
+手动启动（与脚本等价）：
+
 ```powershell
 # 启动后端
 cd backend
@@ -21,6 +30,8 @@ cd frontend
 npm install
 npm run dev
 ```
+
+
 
 打开 http://localhost:5173 ，使用网易云 App 扫码登录。
 
@@ -104,5 +115,7 @@ npm run dev
 ## About
 
 本项目为第三方网易云 Web 播放器，非网易官方产品，仅供学习使用。请尊重版权，支持正版音乐。
+
+> 音乐接口基于 [NeteaseCloudMusic_PythonSDK](https://github.com/2061360308/NeteaseCloudMusic_PythonSDK)（底层为 [MusicLibrary](https://github.com/2061360308/MusicLibrary)）。
 
 > 开发者文档（架构设计、SDK 参考、版本规划）见 `docs/` 目录；版本路线见 `docs/ROADMAP.md`（v0.1.8 样式与展示 → v0.1.9 下载与格式转换）；历史版本设计与进展（v0.1.0–v0.1.6）及 v0.1.5 体验反馈已封存在 `docs/archived/`。
