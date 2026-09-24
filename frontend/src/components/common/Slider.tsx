@@ -18,7 +18,7 @@ interface SliderProps {
   format?: (v: number) => string
   /** 启用滚轮微调（仅音量等可误触安全的场景开启） */
   wheel?: boolean
-  /** 键盘 ←/→/↑/↓ 微调（默认开；音量处暂关，随 v0.1.7 快捷键扩展回归，见 V0.1.7_DESIGN.md §7） */
+  /** 键盘 ←/→/↑/↓ 微调（默认开；音量处暂关，随 v0.1.7 快捷键扩展回归，见 docs/ROADMAP.md） */
   keyboard?: boolean
   disabled?: boolean
   className?: string
