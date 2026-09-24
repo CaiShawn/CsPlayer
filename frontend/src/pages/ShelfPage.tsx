@@ -4,14 +4,17 @@ import { libraryApi } from '../api'
 import type { AlbumBrief } from '../types'
 import { Cover } from '../components/common/Cover'
 import { Empty, Loading } from '../components/common/Ui'
+import { useInfiniteScroll } from '../hooks/useInfiniteScroll'
 import { useAuthStore } from '../stores/authStore'
 import { useContextMenuStore } from '../stores/contextMenuStore'
 
-const PAGE_SIZE = 50
+/** 单批条数（与后端 PAGE 一致）：滚动到底自动续拉，不一次拉全量 */
+const PAGE_SIZE = 30
 
 export function ShelfPage() {
   const dataVersion = useAuthStore((s) => s.dataVersion)
   const [albums, setAlbums] = useState<AlbumBrief[]>([])
+  const [total, setTotal] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -28,6 +31,7 @@ export function ShelfPage() {
       const data = await libraryApi.albums(offset, PAGE_SIZE)
       const items = data.items || []
       setAlbums((prev) => (replace ? items : [...prev, ...items]))
+      setTotal(data.total || 0)
       setHasMore(!!data.hasMore)
     } catch (e) {
       if (replace) setError(e instanceof Error ? e.message : '加载失败')
@@ -48,15 +52,21 @@ export function ShelfPage() {
     }
   }, [dataVersion, load])
 
-  const onLoadMore = () => {
-    if (loadingMore || !hasMore) return
-    void load(albums.length, false)
-  }
+  // 分批加载：滚动到底自动续拉后 30 张
+  const sentinelRef = useInfiniteScroll(
+    () => {
+      if (loadingMore || !hasMore) return
+      void load(albums.length, false)
+    },
+    hasMore && !loadingMore,
+  )
 
   return (
     <div className="p-8 pb-28">
       <h1 className="text-2xl font-bold text-neutral-50">唱片架</h1>
-      <p className="mt-1 text-sm text-neutral-500">收藏的专辑 · 最近 50 张</p>
+      <p className="mt-1 text-sm text-neutral-500">
+        收藏的专辑{total > 0 ? ` · 共 ${total} 张` : ''}
+      </p>
 
       <div className="mt-6">
         {loading ? (
@@ -83,16 +93,10 @@ export function ShelfPage() {
                 </Link>
               ))}
             </div>
+            {/* 分批加载哨兵：滚动到底自动续拉下一批 30 张 */}
             {hasMore && (
-              <div className="mt-8 flex justify-center">
-                <button
-                  type="button"
-                  onClick={onLoadMore}
-                  disabled={loadingMore}
-                  className="rounded-full border border-neutral-700 bg-neutral-900 px-6 py-2 text-sm text-neutral-200 hover:border-accent/50 hover:text-accent-soft disabled:opacity-50"
-                >
-                  {loadingMore ? '加载中…' : '加载更多'}
-                </button>
+              <div ref={sentinelRef} className="py-6 text-center text-xs text-neutral-500">
+                {loadingMore ? '加载中…' : '继续滚动加载更多'}
               </div>
             )}
           </>
