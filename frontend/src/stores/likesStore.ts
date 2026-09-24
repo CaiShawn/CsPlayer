@@ -149,8 +149,8 @@ export const useLikesStore = create<LikesState>((set, get) => {
       }
     },
 
-    /** 「播放全部」用：一次性取回全量曲目（分批 200 续拉，走服务端增量缓存）。
-     *  不改动 tracks 懒加载窗口（列表仍分批渲染），仅返回完整列表供整体替换播放队列。
+    /** 「播放全部」后台补全用：一次性取回全量曲目（分批 200 续拉，走服务端增量缓存）。
+     *  不改动 tracks 懒加载窗口（列表仍分批渲染），仅返回完整列表供补全播放队列。
      *  网络失败向上抛出，由调用方提示；期间切账号返回空数组。 */
     fetchAllTracks: async (dataVersion) => {
       guard(dataVersion)
