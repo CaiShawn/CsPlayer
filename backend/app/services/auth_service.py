@@ -6,6 +6,7 @@ import time
 from ..core.cache import cache
 from ..core.config import settings
 from ..core.errors import bad_gateway, rate_limited, unauthorized
+from ..core.logutil import cred_fingerprint
 from ..core.ncm_client import ncm_call
 from ..core.session import COOKIE_ATTRS, parse_cookie_str, sanitize_cookie, sessions
 from ..models.user import UserProfile
@@ -198,7 +199,8 @@ async def get_me(cookie: dict) -> UserProfile:
 
 
 def _cookie_key(cookie: dict) -> str:
-    return str(cookie.get("MUSIC_U") or "anon")[:24]
+    """缓存键用凭证指纹（sha256 前 16 位），不落任何明文凭证材料（日志脱敏同源）"""
+    return cred_fingerprint(str(cookie.get("MUSIC_U") or "anon"))
 
 
 async def restore(cred) -> dict:

@@ -33,6 +33,12 @@ def _safe_send(conn: Any, payload: dict) -> None:
 
 
 def main(conn: Any) -> None:
+    # 先装日志脱敏：SDK 会直接 print（[ROUTE] ... cookie: {...}），本进程 stdout
+    # 继承自 uvicorn，不过滤就整份凭证落进日志文件（2026-09 审计，logutil.py）
+    from .logutil import install_worker_redaction
+
+    install_worker_redaction()
+
     from MusicLibrary.neteaseCloudMusicApi import NeteaseCloudMusicApi
 
     try:

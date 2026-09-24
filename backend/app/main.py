@@ -9,6 +9,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from .core import ncm_client
 from .core.config import settings
+from .core.logutil import install_logging
 from .routers import auth as auth_router
 from .routers import search as search_router
 from .routers import song as song_router
@@ -16,16 +17,9 @@ from .routers import stream as stream_router
 
 logger = logging.getLogger("csplayer.http")
 
-# csplayer.* 日志统一出口（否则 INFO 级日志无 handler、不输出，S0-1 性能日志依赖它）
-_cs_logger = logging.getLogger("csplayer")
-if not _cs_logger.handlers:
-    _handler = logging.StreamHandler()
-    _handler.setFormatter(
-        logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
-    )
-    _cs_logger.addHandler(_handler)
-    _cs_logger.propagate = False
-_cs_logger.setLevel(logging.INFO)
+# csplayer.* / uvicorn.* 日志统一出口（否则 INFO 无 handler 不输出，S0-1 perf 日志
+# 依赖它）；formatter 全部包装脱敏（凭证只留在浏览器，见 core/logutil.py）
+install_logging()
 
 
 class GzipSkipPaths(GZipMiddleware):
