@@ -62,7 +62,7 @@ export function ShelfPage() {
   )
 
   return (
-    <div className="p-8 pb-28">
+    <div className="p-8 pb-24">
       <h1 className="text-2xl font-bold text-neutral-50">唱片架</h1>
       <p className="mt-1 text-sm text-neutral-500">
         收藏的专辑{total > 0 ? ` · 共 ${total} 张` : ''}
@@ -93,10 +93,13 @@ export function ShelfPage() {
                 </Link>
               ))}
             </div>
-            {/* 分批加载哨兵：滚动到底自动续拉下一批 30 张 */}
+            {/* 分批加载哨兵：紧凑空挡（h-8），滚动到底自动续拉并在空挡内提示加载中 */}
             {hasMore && (
-              <div ref={sentinelRef} className="py-6 text-center text-xs text-neutral-500">
-                {loadingMore ? '加载中…' : '继续滚动加载更多'}
+              <div
+                ref={sentinelRef}
+                className="flex h-8 items-center justify-center text-xs text-neutral-500"
+              >
+                {loadingMore ? '加载中…' : ''}
               </div>
             )}
           </>

@@ -60,7 +60,7 @@ export function LikePage() {
   }
 
   return (
-    <div className="p-8 pb-28">
+    <div className="p-8 pb-24">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-neutral-50">我喜欢</h1>
@@ -102,10 +102,13 @@ export function LikePage() {
             onToggleLike={onToggleLike}
           />
         )}
-        {/* 分批加载哨兵：滚动到底自动续拉下一批 30 首 */}
+        {/* 分批加载哨兵：紧凑空挡（h-8），滚动到底自动续拉并在空挡内提示加载中 */}
         {tracksLoaded && hasMore && (
-          <div ref={sentinelRef} className="py-6 text-center text-xs text-neutral-500">
-            {loadingMore ? '加载中…' : '继续滚动加载更多'}
+          <div
+            ref={sentinelRef}
+            className="flex h-8 items-center justify-center text-xs text-neutral-500"
+          >
+            {loadingMore ? '加载中…' : ''}
           </div>
         )}
       </div>
