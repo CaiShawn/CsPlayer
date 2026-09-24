@@ -1,7 +1,7 @@
 # CsPlayer 后端架构
 
 > FastAPI 应用 + MusicLibrary SDK（隔离在子进程 worker）。组织方式：目录职责 → 核心模块 → 横切关注点 → API 总表 → 去动落点 → 设计取舍。
-> 相关文档：SDK 隔离排查史 `archived/DEBUG.md`；版本设计 `V0.1.6_DESIGN.md` 等；进展与问题记录 `V0.1.6_PROGRESS.md`。
+> 相关文档：SDK 隔离排查史 `archived/DEBUG.md`；版本设计 `archived/V0.1.6_DESIGN.md` 等；进展与问题记录 `archived/V0.1.6_PROGRESS.md`。
 
 ## 1. 目录职责
 
@@ -47,7 +47,7 @@ app/models/          【契约层】Pydantic DTO（前端 types/index.ts 与之�
 
 ### 2.1 `models/` — 数据契约
 
-约定：**Brief 用于列表、Detail 用于详情**（Detail 内嵌 `tracks: list[SongSummary]`）；字段全部带默认值（`""`/`0`），上游缺字段不致构造失败。字段集 = 前端实际使用集（v0.1.6 裁剪：`AlbumBrief` 去 `publishTime/size`；`/api/user/likes` 不再下发冗余 `ids`，前端自 tracks 派生——见 `V0.1.6_DESIGN.md` §12.2）。
+约定：**Brief 用于列表、Detail 用于详情**（Detail 内嵌 `tracks: list[SongSummary]`）；字段全部带默认值（`""`/`0`），上游缺字段不致构造失败。字段集 = 前端实际使用集（v0.1.6 裁剪：`AlbumBrief` 去 `publishTime/size`；`/api/user/likes` 不再下发冗余 `ids`，前端自 tracks 派生——见 `archived/V0.1.6_DESIGN.md` §12.2）。
 
 ### 2.2 `core/ncm_client.py` + `core/ncm_worker.py` — SDK 子进程隔离
 
@@ -233,7 +233,7 @@ uvicorn 事件循环 + 全 `async def`。唯一同步阻塞点（SDK）压进 `m
 | 取舍 | 选择 | 理由 / 代价 |
 |---|---|---|
 | SDK 隔离 | OS 子进程（可丢弃 worker） | 原生崩溃毒化进程，进程内无解；代价：Pipe RPC 开销 + worker 冷启动 1~2s |
-| SDK 并发 | 单线程串行 | 非线程安全；代价：吞吐受限、上游往返不可并行（性能优化因此走「减往返」而非并发，见 `V0.1.6_DESIGN.md` §12.1） |
+| SDK 并发 | 单线程串行 | 非线程安全；代价：吞吐受限、上游往返不可并行（性能优化因此走「减往返」而非并发，见 `archived/V0.1.6_DESIGN.md` §12.1） |
 | 会话 / 缓存 | 全内存 | 零落盘、实现最小；代价：重启掉线（浏览器凭证 `restore` 自愈）、多进程不共享（故单进程部署） |
 | 凭证保管 | 浏览器 localStorage + 后端内存 | 免扫码 + 零落盘；代价：凭据在浏览器侧可见（用户可控、可移除），信任域限 localhost |
 | 日志脱敏 | fd 层接管 + formatter 兜底 | 原生层直写 fd 绕过一切 Python 包装；代价：worker 内两个泵线程 |
