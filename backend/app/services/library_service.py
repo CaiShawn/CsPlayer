@@ -19,8 +19,9 @@ from .mappers import (
 
 logger = logging.getLogger("csplayer.library")
 
-# 专辑 / 我喜欢：按需分批拉取的单批条数（与前端滚动加载批次一致）
-PAGE = 30
+# 专辑 / 我喜欢：上游补拉的单页条数（40：往返次数与单页响应体积的平衡点，
+# 单页越大 SDK/QuickJS 大响应崩溃风险越高，与 _playlist_tracks 统一）
+PAGE = 40
 # 分批拉取安全上限（防上游数据异常导致无限拉取）
 MAX_ITEMS = 2000
 
@@ -228,14 +229,14 @@ async def _playlist_tracks(
     S2-1：调用方可传 hint_total（来自歌单 meta / trackCount），则全部分页
     用 asyncio.gather 一次编排（后续 SDK 并发化后可直接受益），不再逐页串行
     等待；trackCount 滞后时靠「末页满页续拉」兜底。缺 hint 时退化为原串行循环。
-    单页 50 条不变：单页响应越小，SDK/QuickJS 大响应崩溃概率越低。
+    单页 40 条（与 PAGE 统一）：单页响应越小，SDK/QuickJS 大响应崩溃概率越低。
     """
     key = f"playlist:{playlist_id}:tracks"
     cached = cache.get(key)
     if cached:
         return cached
 
-    limit = 50
+    limit = 40
     max_offset = 2000
     all_tracks: list[dict] = []
 
@@ -397,13 +398,25 @@ async def _likes_state(cookie: dict, user_id: int, need: int) -> dict:
     pid = int(state["playlistId"])
     need = max(0, min(int(need), MAX_ITEMS))
     while len(state["tracks"]) < need and not state["complete"]:
-        page = await _fetch_track_page(cookie, pid, len(state["tracks"]), PAGE)
-        state["tracks"].extend(
-            map_song(t).model_dump() for t in page if isinstance(t, dict) and t.get("id")
+        # 缺口多页时一次编排全部缺口页（S2-1，与 _playlist_tracks 一致）：
+        # 目前 SDK 串行实际仍按序执行，SDK 并发化后可直接受益；
+        # 单页网格偏移按原始条数推进，去重/丢弃由 map 过滤自理
+        base = len(state["tracks"])
+        pages = max(1, -(-(need - base) // PAGE))
+        fetched = await asyncio.gather(
+            *[
+                _fetch_track_page(cookie, pid, base + i * PAGE, PAGE)
+                for i in range(pages)
+            ]
         )
-        if len(page) < PAGE:
+        for page in fetched:
+            state["tracks"].extend(
+                map_song(t).model_dump()
+                for t in page
+                if isinstance(t, dict) and t.get("id")
+            )
+        if len(fetched[-1]) < PAGE:
             state["complete"] = True
-        if state["complete"]:
             # 拉全后自校正（trackCount hint 可能滞后）
             state["total"] = len(state["tracks"])
         cache.set(key, state, settings.cache_ttl["user_likes"])
