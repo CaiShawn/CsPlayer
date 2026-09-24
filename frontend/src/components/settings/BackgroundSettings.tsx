@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Slider } from '../common/Slider'
-import { useLikesStore } from '../../stores/likesStore'
+import { useUiStore } from '../../stores/uiStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { SettingRow, SettingSection, Switch } from './controls'
 
@@ -104,7 +104,7 @@ export function BackgroundSettings() {
   const previewRef = useRef<HTMLDivElement>(null)
   const [busy, setBusy] = useState(false)
 
-  const toast = (msg: string) => useLikesStore.getState().setToast(msg)
+  const toast = (msg: string) => useUiStore.getState().setToast(msg)
 
   const onPick = async (file: File | undefined) => {
     if (!file || busy) return

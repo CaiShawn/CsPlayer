@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { labelOf, resolveActions, type ContextAction } from '../../contextMenu/actions'
 import { useContextMenuStore } from '../../stores/contextMenuStore'
-import { useLikesStore } from '../../stores/likesStore'
+import { useUiStore } from '../../stores/uiStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 
 interface Entry {
@@ -64,7 +64,7 @@ export function ContextMenu() {
         target,
         navigate,
         close,
-        toast: (msg) => useLikesStore.getState().setToast(msg),
+        toast: (msg) => useUiStore.getState().setToast(msg),
       })
       return
     }

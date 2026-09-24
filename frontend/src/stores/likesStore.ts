@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { PAGE_SIZE, libraryApi, songApi } from '../api'
+import { useUiStore } from './uiStore'
 import type { SongSummary } from '../types'
 
 /* ---------------------------------------------------------------------------
@@ -34,13 +35,11 @@ interface LikesState {
   refreshing: boolean
   /** 缓存所属账号的 authStore.dataVersion（切账号丢弃缓存，防串数据） */
   version: number
-  toast: string
   fetchIds: (dataVersion: number) => Promise<void>
   fetchTracks: (dataVersion: number) => Promise<void>
   fetchMoreTracks: (dataVersion: number) => Promise<void>
   fetchAllTracks: (dataVersion: number) => Promise<SongSummary[]>
   toggle: (song: SongSummary) => Promise<boolean>
-  setToast: (msg: string) => void
   clear: () => void
 }
 
@@ -70,7 +69,6 @@ export const useLikesStore = create<LikesState>((set, get) => {
   return {
     ...EMPTY,
     version: NO_VERSION,
-    toast: '',
 
     fetchIds: async (dataVersion) => {
       guard(dataVersion) // 仅用于切账号时丢弃缓存
@@ -142,10 +140,8 @@ export const useLikesStore = create<LikesState>((set, get) => {
         })
       } catch (e) {
         if (get().version !== dataVersion) return
-        set({
-          loadingMore: false,
-          toast: e instanceof Error ? e.message : '加载更多失败',
-        })
+        set({ loadingMore: false })
+        useUiStore.getState().setToast(e instanceof Error ? e.message : '加载更多失败')
       }
     },
 
@@ -209,18 +205,16 @@ export const useLikesStore = create<LikesState>((set, get) => {
         return nextLiked
       } catch (e) {
         set({ ids: prevIds, tracks: prevTracks, total: prevTotal })
-        set({ toast: e instanceof Error ? e.message : '更新喜欢失败' })
+        useUiStore.getState().setToast(e instanceof Error ? e.message : '更新喜欢失败')
         return wasLiked
       }
     },
 
-    setToast: (msg) => set({ toast: msg }),
     clear: () =>
       set({
         ...EMPTY,
         ids: new Set(),
         version: NO_VERSION,
-        toast: '',
       }),
   }
 })

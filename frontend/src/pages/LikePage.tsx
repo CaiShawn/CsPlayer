@@ -6,6 +6,7 @@ import { useInfiniteScroll } from '../hooks/useInfiniteScroll'
 import { useAuthStore } from '../stores/authStore'
 import { useLikesStore } from '../stores/likesStore'
 import { usePlayerStore } from '../stores/playerStore'
+import { useUiStore } from '../stores/uiStore'
 
 export function LikePage() {
   const dataVersion = useAuthStore((s) => s.dataVersion)
@@ -20,7 +21,7 @@ export function LikePage() {
   const fetchTracks = useLikesStore((s) => s.fetchTracks)
   const fetchMoreTracks = useLikesStore((s) => s.fetchMoreTracks)
   const fetchAllTracks = useLikesStore((s) => s.fetchAllTracks)
-  const setToast = useLikesStore((s) => s.setToast)
+  const setToast = useUiStore((s) => s.setToast)
   const toggle = useLikesStore((s) => s.toggle)
 
   const currentId = usePlayerStore((s) =>

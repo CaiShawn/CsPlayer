@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { useLikesStore } from '../../stores/likesStore'
+import { useUiStore } from '../../stores/uiStore'
 import { usePlayerStore } from '../../stores/playerStore'
 import { useAudioEngine } from '../../hooks/useAudioEngine'
 import { ContextMenu } from '../common/ContextMenu'
@@ -18,8 +19,8 @@ export function MainLayout() {
   const onHome = location.pathname === '/home'
   const dataVersion = useAuthStore((s) => s.dataVersion)
   const fetchIds = useLikesStore((s) => s.fetchIds)
-  const toast = useLikesStore((s) => s.toast)
-  const setToast = useLikesStore((s) => s.setToast)
+  const toast = useUiStore((s) => s.toast)
+  const setToast = useUiStore((s) => s.setToast)
   const currentId = usePlayerStore((s) =>
     s.currentIndex >= 0 ? s.queue[s.currentIndex]?.id : undefined,
   )

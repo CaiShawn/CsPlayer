@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { songApi } from '../api'
 import { useAuthStore } from '../stores/authStore'
-import { useLikesStore } from '../stores/likesStore'
+import { useUiStore } from '../stores/uiStore'
 import { usePlayerStore } from '../stores/playerStore'
 import { useSettingsStore } from '../stores/settingsStore'
 
@@ -23,7 +23,7 @@ function handlePlayFailure(e: unknown, stale = false): void {
   if (isAbortError(e) || stale) return
   usePlayerStore.getState().setPlaying(false)
   if (e instanceof DOMException && e.name === 'NotAllowedError') {
-    useLikesStore.getState().setToast('浏览器阻止了自动播放，点播放按钮即可从原进度继续')
+    useUiStore.getState().setToast('浏览器阻止了自动播放，点播放按钮即可从原进度继续')
   }
 }
 
@@ -111,7 +111,7 @@ export function useAudioEngine() {
           st.setPlaying(false)
           const action = useSettingsStore.getState().prefs.playback.unplayableAction
           if (action === 'stop') {
-            useLikesStore.getState().setToast(`「${song.name}」不可播放，已停止`)
+            useUiStore.getState().setToast(`「${song.name}」不可播放，已停止`)
           } else {
             st.skipUnplayable()
           }
