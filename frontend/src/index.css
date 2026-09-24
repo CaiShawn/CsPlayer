@@ -19,13 +19,13 @@
      「背景启用」时由下方 [data-bg-enabled] 覆写为半透明，让背景图透出。 */
   --surface-base: #0a0a0a;
   --surface-bar: #0a0a0a;
+  /* 播放队列面板：始终不透明（背景启用时也不透出，2026-09 验收反馈） */
   --surface-panel: #0a0a0a;
 }
 
 html[data-bg-enabled='on'] {
   --surface-base: rgb(10 10 10 / 0.45);
   --surface-bar: rgb(10 10 10 / 0.5); /* 顶栏 / 侧栏：背景启用时更通透（验收微调） */
-  --surface-panel: rgb(10 10 10 / 0.85);
 }
 
 html[data-density='compact'] {

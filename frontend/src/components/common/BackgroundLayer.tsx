@@ -23,13 +23,12 @@ export function BackgroundLayer() {
       const mix = (a: number, b: number) => (a + (b - a) * t).toFixed(3)
       root.style.setProperty('--surface-base', `rgb(10 10 10 / ${mix(0.45, 0.3)})`)
       root.style.setProperty('--surface-bar', `rgb(10 10 10 / ${mix(0.5, 0.35)})`)
-      root.style.setProperty('--surface-panel', `rgb(10 10 10 / ${mix(0.85, 0.7)})`)
+      // --surface-panel（播放队列）始终不透明，不随背景图变透（2026-09 验收反馈）
     } else {
       delete root.dataset.bgEnabled
       // 去掉内联覆盖，回落 CSS 默认实色（与 v0.1.5 一致）
       root.style.removeProperty('--surface-base')
       root.style.removeProperty('--surface-bar')
-      root.style.removeProperty('--surface-panel')
     }
   }, [active, bg.opacity])
 
