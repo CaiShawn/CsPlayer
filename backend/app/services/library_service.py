@@ -6,7 +6,7 @@ from ..core.cache import cache
 from ..core.config import settings
 from ..core.errors import bad_gateway, not_found, unauthorized
 from ..core.ncm_client import ncm_call
-from ..models.album import AlbumBrief, AlbumDetail
+from ..models.album import AlbumDetail
 from ..models.playlist import PlaylistBrief, PlaylistDetail
 from ..models.song import LikeResult, LikedSongs, RecordItem, SongSummary
 from .mappers import (
@@ -18,6 +18,11 @@ from .mappers import (
 )
 
 logger = logging.getLogger("csplayer.library")
+
+# 专辑 / 我喜欢：按需分批拉取的单批条数（与前端滚动加载批次一致）
+PAGE = 30
+# 分批拉取安全上限（防上游数据异常导致无限拉取）
+MAX_ITEMS = 2000
 
 
 def _body_code(resp) -> Any:
@@ -99,51 +104,78 @@ async def _user_playlists_raw(cookie: dict, user_id: int) -> list[dict]:
 
 
 async def user_albums(
-    cookie: dict, user_id: int, offset: int = 0, limit: int | None = None
+    cookie: dict, user_id: int, offset: int = 0, limit: int | None = PAGE
 ) -> dict:
-    key = f"user:{user_id}:albums"
-    cached = cache.get(key)
-    if not cached:
-        all_items: list[AlbumBrief] = []
-        page_offset = 0
-        while True:
-            resp = await _ncm_get(
-                "album_sublist", cookie=cookie, limit=50, offset=page_offset
-            )
-            body = resp.body if isinstance(resp.body, dict) else {}
-            code = int(body.get("code") or resp.status or 0)
-            if resp.status != 200 or code not in (200, 0):
-                raise _upstream_error(resp, "获取收藏专辑失败")
-            data = body.get("data")
-            if not isinstance(data, list):
-                data = body.get("album")
-            if not isinstance(data, list):
-                data = body.get("albums") or []
-            if not isinstance(data, list):
-                data = []
-            for raw in data:
-                if isinstance(raw, dict):
-                    all_items.append(map_album_brief(raw))
-            if len(data) < 50:
-                break
-            page_offset += 50
-            if page_offset > 500:
-                break
+    """收藏专辑分页（每批 30 张，按需补拉）。
 
-        cached = [a.model_dump() for a in all_items]
-        cache.set(key, cached, settings.cache_ttl["album_sublist"])
-
-    total = len(cached)
+    只补拉到能覆盖 offset+limit 的上游页，冷路径不再一次拉全量
+    （旧行为：冷路径连打 ~10 次 album_sublist）；已拉部分入内存缓存，
+    翻页 / 首页取总数（offset=0&limit=1）均命中缓存。limit=None 返回全量。
+    """
     start = max(0, int(offset or 0))
-    if limit is None:
-        items = cached[start:]
-        has_more = False
-    else:
-        size = max(1, min(int(limit), 200))
-        items = cached[start : start + size]
-        has_more = start + size < total
+    size = None if limit is None else max(1, min(int(limit), 200))
+    need = MAX_ITEMS if size is None else start + size
+    state = await _albums_state(cookie, user_id, need)
 
+    items_all = state["items"]
+    items = items_all[start:] if size is None else items_all[start : start + size]
+    total = max(int(state.get("total") or 0), len(items_all))
+    has_more = (not state["complete"]) or start + len(items) < total
     return {"items": items, "hasMore": has_more, "total": total}
+
+
+def _albums_key(user_id: int) -> str:
+    return f"user:{user_id}:albums:pages"
+
+
+async def _albums_state(cookie: dict, user_id: int, need: int) -> dict:
+    """收藏专辑增量缓存：{items, total, complete}，逐批补拉到覆盖 need 条。"""
+    key = _albums_key(user_id)
+    state = cache.get(key)
+    if not isinstance(state, dict):
+        state = {"items": [], "total": 0, "complete": False}
+
+    need = max(0, min(int(need), MAX_ITEMS))
+    while len(state["items"]) < need and not state["complete"]:
+        page_offset = len(state["items"])
+        resp = await _ncm_get(
+            "album_sublist", cookie=cookie, limit=PAGE, offset=page_offset
+        )
+        body = resp.body if isinstance(resp.body, dict) else {}
+        code = int(body.get("code") or resp.status or 0)
+        if resp.status != 200 or code not in (200, 0):
+            raise _upstream_error(resp, "获取收藏专辑失败")
+        data = body.get("data")
+        if not isinstance(data, list):
+            data = body.get("album")
+        if not isinstance(data, list):
+            data = body.get("albums") or []
+        if not isinstance(data, list):
+            data = []
+        page = [
+            map_album_brief(raw).model_dump() for raw in data if isinstance(raw, dict)
+        ]
+        state["items"].extend(page)
+
+        # 上游总数（album_sublist 下发 count/totalCount）：首页计数不必拉全量
+        total = body.get("totalCount")
+        if not isinstance(total, int):
+            total = body.get("count")
+        if isinstance(total, int) and total > len(state["items"]):
+            state["total"] = total
+        more = body.get("hasMore")
+        if not isinstance(more, bool):
+            more = body.get("more")
+        if isinstance(more, bool):
+            state["complete"] = not more
+        elif len(page) < PAGE:
+            state["complete"] = True
+        if not page:
+            state["complete"] = True
+        if state["complete"]:
+            state["total"] = len(state["items"])
+        cache.set(key, state, settings.cache_ttl["album_sublist"])
+    return state
 
 
 async def playlist_detail(cookie: dict, playlist_id: int, user_id: int | None) -> PlaylistDetail:
@@ -300,11 +332,13 @@ async def user_liked_ids(cookie: dict, user_id: int) -> list[int]:
     if cached is not None:
         return cached
 
-    # 单一数据源（S2-1）：likes 缓存命中时直接派生 ids（前端也从 tracks 派生），
-    # 省一次上游 likelist 往返；likes 未缓存时才回 likelist
-    likes_cached = cache.get(f"user:{user_id}:likes")
-    if likes_cached:
-        derived = [int(i) for i in likes_cached.get("ids") or []]
+    # 单一数据源（S2-1）：likes 已完整拉取时直接派生 ids（前端也从 tracks 派生），
+    # 省一次上游 likelist 往返；likes 分批未拉全时回 likelist（ids 需全量）
+    likes_state = cache.get(f"user:{user_id}:likes:pages")
+    if isinstance(likes_state, dict) and likes_state.get("complete"):
+        derived = [
+            int(t.get("id") or 0) for t in likes_state.get("tracks") or [] if t.get("id")
+        ]
         cache.set(key, derived, settings.cache_ttl["user_liked_ids"])
         return derived
 
@@ -318,27 +352,62 @@ async def user_liked_ids(cookie: dict, user_id: int) -> list[int]:
     return result
 
 
-async def user_likes(cookie: dict, user_id: int) -> LikedSongs:
-    key = f"user:{user_id}:likes"
-    cached = cache.get(key)
-    if cached:
-        return LikedSongs(**cached)
+async def user_likes(
+    cookie: dict, user_id: int, offset: int = 0, limit: int | None = PAGE
+) -> LikedSongs:
+    """「我喜欢的音乐」分页（每批 30 首，按需补拉）。
 
-    info = await _liked_playlist(cookie, user_id)
-    pid = int(info["id"])
-    tracks_raw = await _playlist_tracks(
-        cookie, pid, hint_total=int(info.get("trackCount") or 0)
+    滚动到底由前端续拉下一批；冷路径不再一次拉全量（旧行为：冷路径
+    用 _playlist_tracks 一次编排全部分页）。limit=None 返回全量。
+    """
+    start = max(0, int(offset or 0))
+    size = None if limit is None else max(1, min(int(limit), 200))
+    need = MAX_ITEMS if size is None else start + size
+    state = await _likes_state(cookie, user_id, need)
+
+    tracks_raw = state["tracks"]
+    items = tracks_raw[start:] if size is None else tracks_raw[start : start + size]
+    total = max(int(state.get("total") or 0), len(tracks_raw))
+    has_more = (not state["complete"]) or start + len(items) < total
+    return LikedSongs(
+        playlistId=int(state["playlistId"]),
+        tracks=[SongSummary(**t) for t in items],
+        total=total,
+        hasMore=has_more,
     )
-    tracks: list[SongSummary] = [
-        map_song(t) for t in tracks_raw if isinstance(t, dict) and t.get("id")
-    ]
-    result = LikedSongs(
-        playlistId=pid,
-        tracks=tracks,
-        ids=[t.id for t in tracks],
-    )
-    cache.set(key, result.model_dump(), settings.cache_ttl["user_likes"])
-    return result
+
+
+def _likes_key(user_id: int) -> str:
+    return f"user:{user_id}:likes:pages"
+
+
+async def _likes_state(cookie: dict, user_id: int, need: int) -> dict:
+    """「我喜欢」增量缓存：{playlistId, tracks, total, complete}，逐批补拉到覆盖 need 条。"""
+    key = _likes_key(user_id)
+    state = cache.get(key)
+    if not isinstance(state, dict):
+        info = await _liked_playlist(cookie, user_id)
+        state = {
+            "playlistId": int(info["id"]),
+            "tracks": [],
+            "total": int(info.get("trackCount") or 0),
+            "complete": False,
+        }
+
+    pid = int(state["playlistId"])
+    need = max(0, min(int(need), MAX_ITEMS))
+    while len(state["tracks"]) < need and not state["complete"]:
+        page = await _fetch_track_page(cookie, pid, len(state["tracks"]), PAGE)
+        state["tracks"].extend(
+            map_song(t).model_dump() for t in page if isinstance(t, dict) and t.get("id")
+        )
+        if len(page) < PAGE:
+            state["complete"] = True
+        if state["complete"]:
+            # 拉全后自校正（trackCount hint 可能滞后）
+            state["total"] = len(state["tracks"])
+        cache.set(key, state, settings.cache_ttl["user_likes"])
+    return state
 
 
 async def user_record_rank(
@@ -393,6 +462,7 @@ async def _invalidate_like_cache(
     cookie: dict, user_id: int, song_id: int | None = None
 ) -> None:
     cache.invalidate(f"user:{user_id}:likes")
+    cache.invalidate(f"user:{user_id}:likes:pages")
     cache.invalidate(f"user:{user_id}:liked_ids")
     cache.invalidate(f"user:{user_id}:playlists")
     cache.invalidate(f"user:{user_id}:playlists:raw")

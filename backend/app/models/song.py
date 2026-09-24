@@ -42,6 +42,9 @@ class LikedSongs(BaseModel):
     playlistId: int = 0
     tracks: list[SongSummary] = []
     ids: list[int] = []
+    # 分批加载（v0.1.7）：tracks 为当前批次切片，total/hasMore 供前端滚动续拉
+    total: int = 0
+    hasMore: bool = False
 
 
 class LikeResult(BaseModel):
