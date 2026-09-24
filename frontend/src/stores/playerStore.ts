@@ -2,7 +2,12 @@ import { create } from 'zustand'
 import type { Lyric, PlayMode, QualityLevel, SongSummary } from '../types'
 import { findLyricIndex } from '../utils/lyric'
 import { pushRecentPlay } from '../utils/recentPlays'
-import { QUEUE_SESSION_KEY, VOLUME_KEY, useSettingsStore } from './settingsStore'
+import {
+  LYRIC_COLLAPSED_KEY,
+  QUEUE_SESSION_KEY,
+  VOLUME_KEY,
+  useSettingsStore,
+} from './settingsStore'
 
 const emptyLyric: Lyric = { lrc: [], tlyric: [], hasTime: true }
 
@@ -122,10 +127,28 @@ function prevIndex(state: PlayerState): number {
 }
 
 /* ---------------------------------------------------------------------------
- * 播放偏好联动：记住音量（localStorage）、刷新后恢复队列（sessionStorage）
+ * 播放偏好联动：记住音量（localStorage）、刷新后恢复队列（sessionStorage）、
+ * 记忆歌词展开/收起状态（localStorage）
  * ------------------------------------------------------------------------ */
 
 const VOLUME_DEFAULT = 0.8
+
+/** 歌词展开状态：默认展开；'1' = 上次为收起（刷新后跟随） */
+function initialLyricCollapsed(): boolean {
+  try {
+    return localStorage.getItem(LYRIC_COLLAPSED_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function persistLyricCollapsed(collapsed: boolean) {
+  try {
+    localStorage.setItem(LYRIC_COLLAPSED_KEY, collapsed ? '1' : '0')
+  } catch {
+    // ignore
+  }
+}
 
 function initialVolume(): number {
   try {
@@ -209,7 +232,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   lyric: emptyLyric,
   currentLyricIndex: -1,
   queueVisible: false,
-  lyricCollapsed: false,
+  lyricCollapsed: initialLyricCollapsed(),
   loadToken: 0,
 
   currentSong: () => {
@@ -408,8 +431,15 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   setQueueVisible: (v) => {
     if (get().queueVisible !== v) set({ queueVisible: v })
   },
-  toggleLyric: () => set({ lyricCollapsed: !get().lyricCollapsed }),
-  setLyricCollapsed: (v) => set({ lyricCollapsed: v }),
+  toggleLyric: () => {
+    const v = !get().lyricCollapsed
+    set({ lyricCollapsed: v })
+    persistLyricCollapsed(v)
+  },
+  setLyricCollapsed: (v) => {
+    set({ lyricCollapsed: v })
+    persistLyricCollapsed(v)
+  },
 
   handleEnded: () => {
     const s = get()

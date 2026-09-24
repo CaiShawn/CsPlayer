@@ -72,6 +72,8 @@ export const PREFS_VERSION = 1
 export const PREFS_KEY = 'csplayer:prefs:main'
 export const PREFS_BACKUP_KEY = 'csplayer:prefs:backup'
 export const VOLUME_KEY = 'csplayer:prefs:volume'
+/** 歌词展开/收起状态（localStorage 记忆，刷新后跟随上次状态） */
+export const LYRIC_COLLAPSED_KEY = 'csplayer:prefs:lyricCollapsed'
 export const QUEUE_SESSION_KEY = 'csplayer:queue'
 /** 右键菜单配置独立存储（设计 §2.2），schema 损坏时回落默认布局 */
 export const CONTEXT_MENU_KEY = 'csplayer:prefs:contextMenu'
