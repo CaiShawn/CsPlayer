@@ -202,7 +202,7 @@ song:{id}:detail / :lyric / :url:{quality}
 
 同样是内存实现：`sid (secrets.token_urlsafe(24)) → {cookie, user_id, created_at}`，TTL 7 天。
 
-关键点：**服务端保存的是网易云的 Cookie 字符串解析成的 dict**（`{"MUSIC_U": "..."}`），请求上游时把它带给 SDK。也就是说 `wyy_session` 这个 httpOnly Cookie 只是**本地会话 id**。v0.1.4 起，`qr/check` 成功与 `restore` 会把网易云凭据（`cred`）一并下发给浏览器保管（localStorage，v0.1.5 为多账号凭证库），用于后端重启后免扫码重建会话——服务端仍**零落盘**，内存会话里的凭据随进程生命周期消失；信任域权衡见 `docs/V0.1.5_DESIGN.md` §3.1/§6。
+关键点：**服务端保存的是网易云的 Cookie 字符串解析成的 dict**（`{"MUSIC_U": "..."}`），请求上游时把它带给 SDK。也就是说 `wyy_session` 这个 httpOnly Cookie 只是**本地会话 id**。v0.1.4 起，`qr/check` 成功与 `restore` 会把网易云凭据（`cred`）一并下发给浏览器保管（localStorage，v0.1.5 为多账号凭证库），用于后端重启后免扫码重建会话——服务端仍**零落盘**，内存会话里的凭据随进程生命周期消失；信任域权衡见 `docs/archived/V0.1.5_DESIGN.md` §3.1/§6。
 
 另外两个工具函数：`parse_cookie_str`（`"a=1; b=2"` → dict）和 `merge_set_cookie`（把上游 `Set-Cookie` 合并进现有 cookie，处理刷新登录态）。**注意**：解析时会按 `COOKIE_ATTRS` 过滤 `Max-Age/Expires/Path` 等 Set-Cookie 属性——上游 cookie 字符串里混着它们，不能当成 cookie 收进来（历史上曾把 `Path=/wapi/feedback` 之类存进会话污染凭据）。
 

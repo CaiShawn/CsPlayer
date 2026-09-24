@@ -69,20 +69,20 @@ npm run dev
 - **歌词设置** — 字号、翻译行、当前行高亮均可独立控制
 - **数据管理** — 支持一键恢复默认设置或清除本地数据
 
-### 自动播放设置（浏览器侧）
-
-开启「刷新后自动播放」仍被拦时，在浏览器里为本站放行即可（应用内入口：设置 → 播放 → 「刷新后自动播放」 ⓘ）：
-
-- **Chrome**：桌面版已移除「自动播放」站点设置，推荐用**媒体参与度**自动放行——在本站正常听歌一段时间后 Chrome 自动放行（`chrome://media-engagement` 可查本站分数）；开发机可 `chrome://flags/#autoplay-policy` →「No user gesture is required」，或启动参数 `--autoplay-policy=no-user-gesture-required`；另确认 `chrome://settings/content/sound` 中本站未被静音
-- **Edge**：地址栏 🔒 图标 → 「网站设置」→「媒体自动播放」→ 允许；或 `edge://settings/content/mediaAutoplay` 加入允许名单
-- **Firefox**：地址栏 🔒 图标 → 关闭「阻止音频自动播放」；或 `about:preferences#privacy` → 权限 → 自动播放 → 音频「允许」
-- **Safari**：设置 → 网站 → 自动播放 → 对本站选「允许所有自动播放」
-
 ### 故障处理
 
 - 单曲播放失败时可直接点击「重试」，无需刷新页面
 - 播放过程中的临时故障会被自动处理，不影响后续播放
-- 刷新后没有自动播放？多为浏览器自动播放策略拦截（页面会提示「浏览器阻止了自动播放」）：在站点设置里**允许自动播放**即可，详见下文「自动播放设置」
+- 刷新后没有自动播放？多为浏览器自动播放策略拦截（页面会提示「浏览器阻止了自动播放」）：在站点设置里**允许自动播放**即可，详见下文
+
+> ### 自动播放设置（浏览器侧）
+>
+> 开启「刷新后自动播放」仍被拦时，在浏览器里为本站放行即可（应用内入口：设置 → 播放 → 「刷新后自动播放」 ⓘ）：
+>
+> - **Chrome**：桌面版已移除「自动播放」站点设置，推荐用**媒体参与度**自动放行——在本站正常听歌一段时间后 Chrome 自动放行（`chrome://media-engagement` 可查本站分数）；开发机可 `chrome://flags/#autoplay-policy` →「No user gesture is required」，或启动参数 `--autoplay-policy=no-user-gesture-required`；另确认 `chrome://settings/content/sound` 中本站未被静音
+> - **Edge**：地址栏 🔒 图标 → 「网站设置」→「媒体自动播放」→ 允许；或 `edge://settings/content/mediaAutoplay` 加入允许名单
+> - **Firefox**：地址栏 🔒 图标 → 关闭「阻止音频自动播放」；或 `about:preferences#privacy` → 权限 → 自动播放 → 音频「允许」
+> - **Safari**：设置 → 网站 → 自动播放 → 对本站选「允许所有自动播放」
 
 ## Updates
 
@@ -97,4 +97,4 @@ npm run dev
 
 本项目为第三方网易云 Web 播放器，非网易官方产品，仅供学习使用。请尊重版权，支持正版音乐。
 
-> 开发者文档（架构设计、SDK 参考、版本规划）见 `docs/` 目录；当前版本设计见 `docs/V0.1.5_DESIGN.md`（v0.1.5 多账号凭证库，已实现），历史版本设计（v0.1.0–v0.1.4）在 `docs/archived/`。
+> 开发者文档（架构设计、SDK 参考、版本规划）见 `docs/` 目录；开发中版本见 `docs/V0.1.6_DESIGN.md`（v0.1.6 体验优化，排期中）与 `docs/V0.1.7_DESIGN.md`（v0.1.7 唱片墙 + 分享卡片，大纲）；历史版本设计（v0.1.0–v0.1.5）及 v0.1.5 体验反馈已封存在 `docs/archived/`。
