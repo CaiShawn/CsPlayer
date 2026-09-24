@@ -82,20 +82,23 @@ export function VolumeControl() {
   }
 
   return (
-    // gap-3：静音图标 ↔ 音量滑条 12px（与滑条右侧到「词」的间距对齐）
-    <div className="flex items-center gap-3">
-      <button
-        type="button"
-        onClick={handleMute}
-        className="text-neutral-400 hover:text-neutral-100"
-        title={muted ? '取消静音' : '静音'}
-        aria-label={muted ? '取消静音' : '静音'}
-      >
-        <VolumeIcon state={iconState} />
-      </button>
+    /* 音量区占播放条中部右侧 w-56：与左右元素（歌曲时长 / 词）各隔一个 gap-4，
+     * 内部两侧等宽弹性占位把滑轨顶到本区正中 = 「歌曲时长 ↔ 词」的正中；
+     * 静音图标贴滑轨左侧（左占位内右对齐）。 */
+    <div className="flex w-56 items-center justify-center gap-2">
+      <span className="flex min-w-0 flex-1 justify-end">
+        <button
+          type="button"
+          onClick={handleMute}
+          className="text-neutral-400 hover:text-neutral-100"
+          title={muted ? '取消静音' : '静音'}
+          aria-label={muted ? '取消静音' : '静音'}
+        >
+          <VolumeIcon state={iconState} />
+        </button>
+      </span>
       <Slider
-        // -mr-2：吃掉「词」按钮 px-2 的左内边距，滑轨 → 「词」字形同样 12px
-        className="w-20 -mr-2"
+        className="w-20"
         value={muted ? 0 : volume}
         onChange={setVolume}
         label="音量"
@@ -103,6 +106,8 @@ export function VolumeControl() {
         wheel
         keyboard={false} /* 键盘调音量暂时关闭，随 v0.1.7 快捷键扩展回归；恢复 = 删掉这一行 */
       />
+      {/* 右侧等宽占位：与左占位对称，保证滑轨居中 */}
+      <span className="min-w-0 flex-1" aria-hidden />
     </div>
   )
 }

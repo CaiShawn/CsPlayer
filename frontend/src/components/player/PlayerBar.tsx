@@ -96,9 +96,11 @@ export function PlayerBar() {
           <ProgressBar />
         </div>
 
+        {/* 音量区：滑轨居中于「歌曲时长 ↔ 词」的正中（组件自带 w-56 占位） */}
+        <VolumeControl />
+
         {/* right tools */}
-        <div className="flex w-56 items-center justify-end gap-3">
-          <VolumeControl />
+        <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={toggleLyric}
