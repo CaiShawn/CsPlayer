@@ -34,6 +34,8 @@ export interface PlaybackPrefs {
   unplayableAction: UnplayableAction
   restoreQueue: boolean
   autoNext: boolean
+  /** 刷新恢复队列后是否自动继续播放（关闭则停在原进度待手动播放） */
+  autoPlayOnRestore: boolean
 }
 
 export interface LyricPrefs {
@@ -71,6 +73,7 @@ export const DEFAULT_PREFS: Prefs = {
     unplayableAction: 'skip',
     restoreQueue: true,
     autoNext: true,
+    autoPlayOnRestore: true,
   },
   lyric: {
     fontSize: 'md',

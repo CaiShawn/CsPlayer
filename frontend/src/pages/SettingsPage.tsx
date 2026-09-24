@@ -5,6 +5,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { ColorPicker } from '../components/settings/ColorPicker'
 import { AccountsSettings } from '../components/settings/AccountsSettings'
 import { ContextMenuSettings } from '../components/settings/ContextMenuSettings'
+import { InfoButton } from '../components/settings/InfoModal'
 import { Segmented, SettingRow, SettingSection, Switch } from '../components/settings/controls'
 import { APP_VERSION } from '../version'
 
@@ -171,11 +172,30 @@ export function SettingsPage() {
               ]}
             />
           </SettingRow>
-          <SettingRow label="刷新后恢复队列" hint="刷新页面后恢复播放队列与进度位置（不会自动播放）">
+          <SettingRow
+            label="刷新后恢复队列"
+            hint="刷新页面后恢复播放队列与原播放进度（是否自动继续播放由下一项控制）"
+          >
             <Switch
               label="刷新后恢复队列"
               checked={prefs.playback.restoreQueue}
               onChange={(restoreQueue) => updatePlayback({ restoreQueue })}
+            />
+          </SettingRow>
+          <SettingRow
+            label="刷新后自动播放"
+            hint="刷新恢复后从原进度自动继续播放；关闭则停在原进度待手动播放（需开启「刷新后恢复队列」）"
+          >
+            <InfoButton
+              title="自动播放被浏览器拦截？"
+              label="自动播放设置遇到问题？查看浏览器侧解决方案"
+            >
+              <AutoplayHelp />
+            </InfoButton>
+            <Switch
+              label="刷新后自动播放"
+              checked={prefs.playback.autoPlayOnRestore}
+              onChange={(autoPlayOnRestore) => updatePlayback({ autoPlayOnRestore })}
             />
           </SettingRow>
           <SettingRow label="自动续播下一首" hint="当前曲目播完后自动继续；关闭则播完停住">
@@ -278,5 +298,60 @@ export function SettingsPage() {
         </SettingSection>
       </div>
     </div>
+  )
+}
+
+/** 「刷新后自动播放」 ⓘ 弹窗内容：浏览器侧放行自动播放的解决方案 */
+function AutoplayHelp() {
+  return (
+    <>
+      <div>
+        开启后若刷新仍未自动播放（提示「浏览器阻止了自动播放」），是浏览器自动播放策略拦截——刷新后页面没有用户手势，
+        浏览器禁止出声播放。在浏览器里为本站放行即可：
+      </div>
+      <div>
+        <div className="text-neutral-200">Chrome（注意：没有「自动播放」站点设置）</div>
+        桌面版 Chrome 已移除该设置页（旧地址{' '}
+        <span className="text-neutral-300">chrome://settings/content/mediaAutoplay</span> 会跳回设置首页），可选做法：
+        <ul className="mt-1 list-disc space-y-0.5 pl-4">
+          <li>
+            媒体参与度自动放行（推荐）：在本站正常听歌一段时间后 Chrome 会自动放行；可打开{' '}
+            <span className="text-neutral-300">chrome://media-engagement</span> 查看本站分数，
+            「Autoplay allowed」显示「是」即已生效。
+          </li>
+          <li>
+            开发机全局放开：<span className="text-neutral-300">chrome://flags/#autoplay-policy</span> →
+            「No user gesture is required」后重启；或给 Chrome 快捷方式加启动参数{' '}
+            <span className="text-neutral-300">--autoplay-policy=no-user-gesture-required</span>。
+          </li>
+          <li>
+            确认声音权限没被拉黑：<span className="text-neutral-300">chrome://settings/content/sound</span> →
+            本站选「允许」（被「静音」的站点会直接无声）。
+          </li>
+        </ul>
+      </div>
+      <div>
+        <div className="text-neutral-200">Edge</div>
+        地址栏左侧图标（🔒/调节）→「网站设置」→「媒体自动播放」→ 允许；或打开{' '}
+        <span className="text-neutral-300">edge://settings/content/mediaAutoplay</span> 把本站加入允许名单（Edge 保留了该设置页）。
+      </div>
+      <div>
+        <div className="text-neutral-200">Firefox</div>
+        地址栏 🔒 图标 → 关闭「阻止音频自动播放」；或{' '}
+        <span className="text-neutral-300">about:preferences#privacy</span> → 权限 → 自动播放 → 音频选「允许」。
+      </div>
+      <div>
+        <div className="text-neutral-200">Safari</div>
+        Safari → 设置 → 网站 → 自动播放 → 对本站选「允许所有自动播放」。
+      </div>
+      <div>
+        <div className="text-neutral-200">其他</div>
+        首次点一下播放按钮后，本页后续的手动播放/切歌都会正常；被拦截时应用会提示「浏览器阻止了自动播放」。
+      </div>
+      <div>
+        <div className="text-neutral-200">如果其实播了但没声音</div>
+        检查播放器音量是否为 0 / 静音（🔇）、系统音量合成器里浏览器是否被静音、标签页是否被右键静音。
+      </div>
+    </>
   )
 }

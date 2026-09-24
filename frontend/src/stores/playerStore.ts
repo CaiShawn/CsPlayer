@@ -139,6 +139,8 @@ interface QueueSession {
   queue: SongSummary[]
   currentIndex: number
   quality: QualityLevel
+  /** 刷新时刻的播放进度（秒），恢复后从该位置继续 */
+  currentTime: number
 }
 
 function readQueueSession(): QueueSession | null {
@@ -155,7 +157,11 @@ function readQueueSession(): QueueSession | null {
       typeof parsed.currentIndex === 'number'
         ? Math.max(0, Math.min(parsed.currentIndex, parsed.queue.length - 1))
         : 0
-    return { queue: parsed.queue, currentIndex, quality }
+    const currentTime =
+      typeof parsed.currentTime === 'number' && Number.isFinite(parsed.currentTime) && parsed.currentTime > 0
+        ? parsed.currentTime
+        : 0
+    return { queue: parsed.queue, currentIndex, quality, currentTime }
   } catch {
     return null
   }
@@ -170,7 +176,12 @@ function writeQueueSession(): void {
     }
     sessionStorage.setItem(
       QUEUE_SESSION_KEY,
-      JSON.stringify({ queue: s.queue, currentIndex: s.currentIndex, quality: s.quality }),
+      JSON.stringify({
+        queue: s.queue,
+        currentIndex: s.currentIndex,
+        quality: s.quality,
+        currentTime: s.currentTime,
+      }),
     )
   } catch {
     // ignore
@@ -185,10 +196,11 @@ const queueSession = readQueueSession()
 export const usePlayerStore = create<PlayerState>((set, get) => ({
   queue: queueSession?.queue ?? [],
   currentIndex: queueSession?.currentIndex ?? -1,
-  playing: false,
+  // 「刷新后自动播放」开启且有恢复队列时：刷新即自动继续播放（从原进度）
+  playing: !!queueSession && useSettingsStore.getState().prefs.playback.autoPlayOnRestore,
   playMode: 'list-loop',
   quality: queueSession?.quality ?? 'lossless', // 默认 SQ（无损）
-  currentTime: 0,
+  currentTime: queueSession?.currentTime ?? 0,
   duration: 0,
   volume: initialVolume(),
   muted: false,
@@ -276,7 +288,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     set({ playing: !playing })
   },
 
-  setPlaying: (v) => set({ playing: v }),
+  /** 播放意图（唯一事实源，由 useAudioEngine 强制执行）；幂等写入，避免无谓通知 */
+  setPlaying: (v) => {
+    if (get().playing !== v) set({ playing: v })
+  },
   seek: (sec) => set({ currentTime: sec }),
   setCurrentTime: (sec) => set({ currentTime: sec }),
   setDuration: (sec) => set({ duration: sec }),
@@ -342,10 +357,23 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
           duration: 0,
           lyric: emptyLyric,
           currentLyricIndex: -1,
+          // 通知引擎卸载音源（否则空队列仍可能把旧曲播回来）
+          loadToken: loadToken + 1,
         })
         return
       }
       loadToken += 1
+      // 换成了新曲：进度归零（否则旧曲进度会被当成新曲起点）
+      set({
+        queue,
+        currentIndex,
+        loadToken,
+        currentTime: 0,
+        duration: 0,
+        lyric: emptyLyric,
+        currentLyricIndex: -1,
+      })
+      return
     } else if (index < s.currentIndex) {
       currentIndex = s.currentIndex - 1
     }
@@ -353,7 +381,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   clearQueue: () =>
-    set({
+    set((s) => ({
       queue: [],
       currentIndex: -1,
       playing: false,
@@ -361,7 +389,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       duration: 0,
       lyric: emptyLyric,
       currentLyricIndex: -1,
-    }),
+      // 通知引擎卸载音源（否则空队列仍可能把旧曲播回来）
+      loadToken: s.loadToken + 1,
+    })),
 
   setLyric: (lyric) => set({ lyric, currentLyricIndex: -1 }),
 
@@ -435,13 +465,23 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 }))
 
-// 队列 / 进度 / 音质变化时写入 sessionStorage（受「刷新后恢复队列」开关控制）
+// 队列 / 进度 / 音质变化时写入 sessionStorage（受「刷新后恢复队列」开关控制）；
+// 进度写入节流 ≥2s 一次，避免 timeupdate 频繁序列化整个队列
+let lastSessionWrite = 0
 usePlayerStore.subscribe((state, prev) => {
-  if (
+  const metaChanged =
     state.queue !== prev.queue ||
     state.currentIndex !== prev.currentIndex ||
     state.quality !== prev.quality
-  ) {
+  if (!metaChanged && state.currentTime === prev.currentTime) return
+  const now = Date.now()
+  if (metaChanged || now - lastSessionWrite >= 2000) {
+    lastSessionWrite = now
     writeQueueSession()
   }
 })
+
+// 刷新 / 关页前兜底写一次最终进度（补偿节流漏掉的最后一段）
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => writeQueueSession())
+}
