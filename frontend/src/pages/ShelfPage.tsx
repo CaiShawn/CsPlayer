@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { libraryApi } from '../api'
 import type { AlbumBrief } from '../types'
 import { Cover } from '../components/common/Cover'
-import { Empty, Loading } from '../components/common/Ui'
+import { Empty, Loading, LoadingMore } from '../components/common/Ui'
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll'
 import { useAuthStore } from '../stores/authStore'
 import { useContextMenuStore } from '../stores/contextMenuStore'
@@ -93,15 +93,8 @@ export function ShelfPage() {
                 </Link>
               ))}
             </div>
-            {/* 分批加载哨兵：紧凑空挡（h-8），滚动到底自动续拉并在空挡内提示加载中 */}
-            {hasMore && (
-              <div
-                ref={sentinelRef}
-                className="flex h-8 items-center justify-center text-xs text-neutral-500"
-              >
-                {loadingMore ? '加载中…' : ''}
-              </div>
-            )}
+            {/* 分批加载哨兵：紧凑空挡（h-8），滚动到底自动续拉并在空挡内高亮提示加载中 */}
+            {hasMore && <div ref={sentinelRef}>{loadingMore && <LoadingMore />}</div>}
           </>
         )}
       </div>

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import type { SongSummary } from '../types'
-import { Empty, ErrorBar, LoadError, SongSkeleton } from '../components/common/Ui'
+import { Empty, ErrorBar, LoadError, LoadingMore, SongSkeleton } from '../components/common/Ui'
 import { SongTable } from '../components/media/SongTable'
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll'
 import { useAuthStore } from '../stores/authStore'
@@ -102,14 +102,9 @@ export function LikePage() {
             onToggleLike={onToggleLike}
           />
         )}
-        {/* 分批加载哨兵：紧凑空挡（h-8），滚动到底自动续拉并在空挡内提示加载中 */}
+        {/* 分批加载哨兵：紧凑空挡（h-8），滚动到底自动续拉并在空挡内高亮提示加载中 */}
         {tracksLoaded && hasMore && (
-          <div
-            ref={sentinelRef}
-            className="flex h-8 items-center justify-center text-xs text-neutral-500"
-          >
-            {loadingMore ? '加载中…' : ''}
-          </div>
+          <div ref={sentinelRef}>{loadingMore && <LoadingMore />}</div>
         )}
       </div>
     </div>
