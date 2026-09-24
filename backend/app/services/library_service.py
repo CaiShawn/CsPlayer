@@ -19,8 +19,8 @@ from .mappers import (
 
 logger = logging.getLogger("csplayer.library")
 
-# 专辑 / 我喜欢：上游补拉的单页条数（40：往返次数与单页响应体积的平衡点，
-# 单页越大 SDK/QuickJS 大响应崩溃风险越高，与 _playlist_tracks 统一）
+# 上游补拉单页条数 = 对外默认批（与前端 api.PAGE_SIZE 对齐，均为 40）：
+# 单页越大 SDK/QuickJS 大响应崩溃风险越高，越小则上游往返越多
 PAGE = 40
 # 分批拉取安全上限（防上游数据异常导致无限拉取）
 MAX_ITEMS = 2000
@@ -107,7 +107,7 @@ async def _user_playlists_raw(cookie: dict, user_id: int) -> list[dict]:
 async def user_albums(
     cookie: dict, user_id: int, offset: int = 0, limit: int | None = PAGE
 ) -> dict:
-    """收藏专辑分页（每批 30 张，按需补拉）。
+    """收藏专辑分页（按需补拉，批大小 PAGE）。
 
     只补拉到能覆盖 offset+limit 的上游页，冷路径不再一次拉全量
     （旧行为：冷路径连打 ~10 次 album_sublist）；已拉部分入内存缓存，
@@ -229,15 +229,15 @@ async def _playlist_tracks(
     S2-1：调用方可传 hint_total（来自歌单 meta / trackCount），则全部分页
     用 asyncio.gather 一次编排（后续 SDK 并发化后可直接受益），不再逐页串行
     等待；trackCount 滞后时靠「末页满页续拉」兜底。缺 hint 时退化为原串行循环。
-    单页 40 条（与 PAGE 统一）：单页响应越小，SDK/QuickJS 大响应崩溃概率越低。
+    单页 PAGE 条：单页响应越小，SDK/QuickJS 大响应崩溃概率越低。
     """
     key = f"playlist:{playlist_id}:tracks"
     cached = cache.get(key)
     if cached:
         return cached
 
-    limit = 40
-    max_offset = 2000
+    limit = PAGE
+    max_offset = MAX_ITEMS
     all_tracks: list[dict] = []
 
     if hint_total and hint_total > 0:
@@ -356,7 +356,7 @@ async def user_liked_ids(cookie: dict, user_id: int) -> list[int]:
 async def user_likes(
     cookie: dict, user_id: int, offset: int = 0, limit: int | None = PAGE
 ) -> LikedSongs:
-    """「我喜欢的音乐」分页（每批 30 首，按需补拉）。
+    """「我喜欢的音乐」分页（按需补拉，批大小 PAGE）。
 
     滚动到底由前端续拉下一批；冷路径不再一次拉全量（旧行为：冷路径
     用 _playlist_tracks 一次编排全部分页）。limit=None 返回全量。

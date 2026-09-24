@@ -31,7 +31,8 @@ SEARCH_TYPES: dict[str, tuple[int, str, str]] = {
 }
 
 MAX_KEYWORD_LEN = 60  # 超长关键字直接拒绝（参数错误）
-DEFAULT_LIMIT = 30
+# 对外默认批大小（与前端 api.PAGE_SIZE / library_service.PAGE 对齐，均为 40）
+DEFAULT_LIMIT = 40
 MAX_LIMIT = 50
 
 SHORT_KEYWORD_LEN = 2  # 关键字长度 < 2 视为「过短」，风控更严
@@ -219,11 +220,11 @@ async def artist_detail(cookie: dict, artist_id: int) -> ArtistDetail:
 
 
 async def artist_albums(
-    cookie: dict, artist_id: int, offset: int = 0, limit: int = 30
+    cookie: dict, artist_id: int, offset: int = 0, limit: int = DEFAULT_LIMIT
 ) -> dict:
-    """歌手专辑分页（歌手页每页 30 张 + 「加载更多」）。"""
+    """歌手专辑分页（歌手页每页 PAGE_SIZE 张 + 「加载更多」）。"""
     offset = max(0, int(offset or 0))
-    limit = max(1, min(int(limit or 30), 50))
+    limit = max(1, min(int(limit or DEFAULT_LIMIT), MAX_LIMIT))
     key = f"artist:{artist_id}:albums:{limit}:{offset}"
     cached = cache.get(key)
     if cached is not None:

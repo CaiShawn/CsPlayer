@@ -16,10 +16,10 @@ async def user_playlists(session: dict = Depends(get_session)) -> ApiResponse:
 @router.get("/user/albums")
 async def user_albums(
     offset: int = Query(default=0, ge=0),
-    limit: int | None = Query(default=30, ge=1, le=200),
+    limit: int | None = Query(default=40, ge=1, le=200),
     session: dict = Depends(get_session),
 ) -> ApiResponse:
-    """收藏专辑分页：每批 30 张按需补拉（滚动到底续拉，不一次拉全量）。"""
+    """收藏专辑分页：每批 40 张按需补拉（滚动到底续拉，不一次拉全量）。"""
     data = await library_service.user_albums(
         session["cookie"], session["user_id"], offset=offset, limit=limit
     )
@@ -76,10 +76,10 @@ async def song_detail(song_id: int, session: dict = Depends(get_session)) -> Api
 @router.get("/user/likes")
 async def user_likes(
     offset: int = Query(default=0, ge=0),
-    limit: int | None = Query(default=30, ge=1, le=200),
+    limit: int | None = Query(default=40, ge=1, le=200),
     session: dict = Depends(get_session),
 ) -> ApiResponse:
-    """我喜欢：每批 30 首按需补拉（滚动到底续拉，不一次拉全量）。"""
+    """我喜欢：每批 40 首按需补拉（滚动到底续拉，不一次拉全量）。"""
     data = await library_service.user_likes(
         session["cookie"], session["user_id"], offset=offset, limit=limit
     )

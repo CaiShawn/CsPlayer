@@ -11,7 +11,7 @@ router = APIRouter(tags=["search"])
 async def search(
     kw: str = Query(default=""),
     type: str = Query(default="song"),
-    limit: int = Query(default=30, ge=1, le=50),
+    limit: int = Query(default=40, ge=1, le=50),
     offset: int = Query(default=0, ge=0),
     session: dict = Depends(get_session),
 ) -> ApiResponse:
@@ -38,7 +38,7 @@ async def artist_detail(
 async def artist_albums(
     artist_id: int,
     offset: int = Query(default=0, ge=0),
-    limit: int = Query(default=30, ge=1, le=50),
+    limit: int = Query(default=40, ge=1, le=50),
     session: dict = Depends(get_session),
 ) -> ApiResponse:
     data = await search_service.artist_albums(
