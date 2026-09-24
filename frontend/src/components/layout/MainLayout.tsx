@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { useLikesStore } from '../../stores/likesStore'
 import { usePlayerStore } from '../../stores/playerStore'
@@ -14,6 +14,8 @@ import { TopBar } from './TopBar'
 
 export function MainLayout() {
   useAudioEngine()
+  const location = useLocation()
+  const onHome = location.pathname === '/home'
   const dataVersion = useAuthStore((s) => s.dataVersion)
   const fetchIds = useLikesStore((s) => s.fetchIds)
   const toast = useLikesStore((s) => s.toast)
@@ -36,7 +38,9 @@ export function MainLayout() {
         <TopBar />
         <div className="flex min-h-0 flex-1">
           <Sidebar />
-          <main className="min-w-0 flex-1 overflow-y-auto pb-24 pl-2">
+          <main
+            className={`min-w-0 flex-1 overflow-y-auto pb-24 pl-2 ${onHome ? 'scrollbar-none' : ''}`}
+          >
             <Outlet />
           </main>
           {showLyric && <LyricPanel />}
