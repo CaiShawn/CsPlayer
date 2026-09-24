@@ -33,9 +33,22 @@ async def qr_check(body: dict, response: Response) -> ApiResponse:
             {
                 "status": "success",
                 "user": result["user"].model_dump(),
+                # 网易云凭证交由浏览器保管（v0.1.4），后端不落盘
+                "cred": result["cookie"],
             }
         )
     return ok({"status": result["status"]})
+
+
+@router.post("/restore")
+async def restore(
+    response: Response, body: dict | None = None
+) -> ApiResponse:
+    """用浏览器保存的凭证重建会话，免扫码。无需已有会话（本身即造会话入口）。"""
+    cred = body.get("cred") if isinstance(body, dict) else None
+    result = await auth_service.restore(cred)
+    set_session_cookie(response, result["sid"])
+    return ok({"user": result["user"].model_dump()})
 
 
 @router.get("/me")

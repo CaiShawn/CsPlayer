@@ -2,6 +2,8 @@ import { api, http } from './client'
 
 export { setUnauthorizedHandler, ApiError } from './client'
 
+import type { NcmCred } from '../utils/cred'
+
 import type {
   AlbumBrief,
   AlbumDetail,
@@ -25,7 +27,12 @@ export const authApi = {
   qrCreate: (unikey: string) =>
     http.post<{ unikey: string; qrimg: string }>('/api/auth/qr/create', { unikey }),
   qrCheck: (unikey: string) =>
-    http.post<{ status: QrStatus; user?: UserProfile }>('/api/auth/qr/check', { unikey }),
+    http.post<{ status: QrStatus; user?: UserProfile; cred?: NcmCred }>(
+      '/api/auth/qr/check',
+      { unikey },
+    ),
+  /** 用浏览器保存的凭证重建会话（不走 requestWithAuth，避免 401 触发登出回调造成循环） */
+  restore: (cred: NcmCred) => http.post<{ user: UserProfile }>('/api/auth/restore', { cred }),
   me: () => api.get<UserProfile>('/api/auth/me'),
   logout: () => api.post<Record<string, never>>('/api/auth/logout'),
 }

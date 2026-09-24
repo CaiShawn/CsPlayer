@@ -70,6 +70,24 @@ def parse_cookie_str(raw: str) -> dict[str, str]:
     return result
 
 
+def sanitize_cookie(raw: object) -> dict[str, str]:
+    """过滤 Max-Age/Expires/Path 等非 cookie 键，只保留真正的 cookie 键值。
+
+    用于登录链路与 restore 凭证清洗（v0.1.4），与 parse_cookie_str 同规则。
+    """
+    result: dict[str, str] = {}
+    if not isinstance(raw, dict):
+        return result
+    for k, v in raw.items():
+        key = str(k).strip()
+        if not key or key.lower() in COOKIE_ATTRS:
+            continue
+        if v is None:
+            continue
+        result[key] = str(v).strip()
+    return result
+
+
 def merge_set_cookie(headers: dict, cookie: dict[str, str]) -> dict[str, str]:
     """Merge Set-Cookie header value(s) into cookie dict."""
     raw = headers.get("Set-Cookie") or headers.get("set-cookie") or ""

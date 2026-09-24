@@ -7,7 +7,7 @@ from ..core.cache import cache
 from ..core.config import settings
 from ..core.errors import bad_gateway, rate_limited, unauthorized
 from ..core.ncm_client import ncm_call
-from ..core.session import COOKIE_ATTRS, parse_cookie_str, sessions
+from ..core.session import COOKIE_ATTRS, parse_cookie_str, sanitize_cookie, sessions
 from ..models.user import UserProfile
 from .mappers import map_user_profile
 
@@ -163,7 +163,8 @@ async def qr_check(unikey: str) -> dict:
         if isinstance(raw, str):
             cookie = parse_cookie_str(raw)
         elif isinstance(raw, dict):
-            cookie = {str(k): str(v) for k, v in raw.items()}
+            cookie = sanitize_cookie(raw)
+    cookie = sanitize_cookie(cookie)
     if not cookie:
         raise bad_gateway("登录成功但未获取到 Cookie")
 
@@ -198,6 +199,19 @@ async def get_me(cookie: dict) -> UserProfile:
 
 def _cookie_key(cookie: dict) -> str:
     return str(cookie.get("MUSIC_U") or "anon")[:24]
+
+
+async def restore(cred) -> dict:
+    """用浏览器保存的网易云凭证重建会话（纯内存，不落盘）。"""
+    music_u = cred.get("MUSIC_U") if isinstance(cred, dict) else None
+    if not isinstance(music_u, str) or not music_u:
+        raise unauthorized("凭证无效，请重新扫码登录")
+    cookie = sanitize_cookie(cred)
+    if not cookie.get("MUSIC_U"):
+        raise unauthorized("凭证无效，请重新扫码登录")
+    profile = await _fetch_profile(cookie)
+    sid = sessions.create(cookie, profile.userId)
+    return {"user": profile, "sid": sid}
 
 
 async def logout(sid: str, cookie: dict) -> dict:

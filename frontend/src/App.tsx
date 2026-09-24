@@ -43,9 +43,17 @@ export default function App() {
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
-      clear()
-      usePlayerStore.getState().clearQueue()
-      navigate('/login', { replace: true })
+      // 先用浏览器保存的凭证静默恢复（v0.1.4）；成功留在当前页（dataVersion 自愈），
+      // 失败才清空状态并回登录页扫码
+      void useAuthStore
+        .getState()
+        .restoreSession()
+        .then((restored) => {
+          if (restored) return
+          clear()
+          usePlayerStore.getState().clearQueue()
+          navigate('/login', { replace: true })
+        })
     })
   }, [clear, navigate])
 
