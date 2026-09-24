@@ -105,6 +105,7 @@ export function AlbumPage() {
   } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [reload, setReload] = useState(0)
 
   const currentId = usePlayerStore((s) =>
     s.currentIndex >= 0 ? s.queue[s.currentIndex]?.id : undefined,
@@ -129,10 +130,10 @@ export function AlbumPage() {
     return () => {
       cancelled = true
     }
-  }, [id, dataVersion])
+  }, [id, dataVersion, reload])
 
   if (loading) return <Loading />
-  if (error) return <div className="p-8 text-center text-sm text-red-400">{error}</div>
+  if (error) return <LoadError message={error} onRetry={() => setReload((n) => n + 1)} />
   if (!detail) return <Empty text="专辑不存在" />
 
   const playAll = () => {
