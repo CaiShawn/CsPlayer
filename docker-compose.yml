@@ -22,7 +22,7 @@ services:
     restart: unless-stopped
     ports:
       # 对外端口，可覆盖：CSPORT=9000 docker compose up -d
-      - "${CSPORT:-3000}:80"
+      - "${CSPORT:-7729}:80"
     depends_on:
       backend:
         condition: service_healthy
