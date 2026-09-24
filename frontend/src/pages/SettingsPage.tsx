@@ -308,9 +308,6 @@ export function SettingsPage() {
             <div className="text-sm text-neutral-200">CsPlayer v{APP_VERSION}</div>
             <div className="mt-1">第三方网易云 Web 播放器（Third-party web player for NCM），非网易官方产品。</div>
             <div>本项目仅供学习使用，请尊重版权，支持正版音乐。</div>
-            <div className="mt-2">
-              文档：仓库内 <span className="text-neutral-400">docs/</span> 目录（V0.1.x_DESIGN.md、SDK参考文档.md 等，历史版本见 docs/archived/）
-            </div>
           </div>
         </SettingSection>
       </div>
