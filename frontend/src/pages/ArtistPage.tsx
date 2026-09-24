@@ -108,7 +108,10 @@ export function ArtistPage() {
 
   const playAll = () => {
     const playable = hotSongs.filter((t) => t.playable)
-    if (playable.length) usePlayerStore.getState().playSongs(playable, 0)
+    if (playable.length)
+      usePlayerStore
+        .getState()
+        .playSongs(playable, 0, detail ? `歌手《${detail.name}》` : '热门歌曲')
   }
 
   const onPlay = (index: number) => {
@@ -116,7 +119,9 @@ export function ArtistPage() {
     const song = hotSongs[index]
     if (!song?.playable) return
     const start = playable.findIndex((t) => t.id === song.id)
-    usePlayerStore.getState().playSongs(playable, Math.max(0, start))
+    usePlayerStore
+      .getState()
+      .playSongs(playable, Math.max(0, start), detail ? `歌手《${detail.name}》` : '热门歌曲')
   }
 
   return (

@@ -46,7 +46,7 @@ export function RecordPage() {
   const playAll = () => {
     const playable = tracks.filter((t) => t.playable)
     if (!playable.length) return
-    usePlayerStore.getState().playSongs(playable, 0)
+    usePlayerStore.getState().playSongs(playable, 0, '自听榜')
   }
 
   const onPlay = (index: number) => {
@@ -54,7 +54,7 @@ export function RecordPage() {
     const song = tracks[index]
     if (!song?.playable) return
     const start = playable.findIndex((t) => t.id === song.id)
-    usePlayerStore.getState().playSongs(playable, Math.max(0, start))
+    usePlayerStore.getState().playSongs(playable, Math.max(0, start), '自听榜')
   }
 
   return (

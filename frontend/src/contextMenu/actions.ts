@@ -57,6 +57,13 @@ function artistIdOf(target: ContextTarget): number {
   return 0
 }
 
+/** 队列来源标签（A2）：播放队列面板标题下展示 */
+function sourceLabelOf(target: ContextTarget): string {
+  if (target.kind === 'album') return `专辑《${target.album.name}》`
+  if (target.kind === 'playlist') return `歌单《${target.playlist.name}》`
+  return '单曲'
+}
+
 /** 目标对应的完整歌曲列表（专辑 / 歌单实时取详情，动作不新开服务层） */
 async function collectTracks(target: ContextTarget): Promise<SongSummary[]> {
   if (target.kind === 'song') return [target.song]
@@ -114,7 +121,7 @@ export const CONTEXT_ACTIONS: ContextAction[] = [
           toast('没有可播放的歌曲')
           return
         }
-        player.playSongs(playable, start)
+        player.playSongs(playable, start, sourceLabelOf(target))
       } catch (e) {
         toast(e instanceof Error ? e.message : '播放失败')
       }

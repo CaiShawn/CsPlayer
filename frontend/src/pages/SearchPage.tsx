@@ -117,7 +117,7 @@ export function SearchPage() {
 
   const playAll = () => {
     const playable = songList.filter((t) => t.playable)
-    if (playable.length) usePlayerStore.getState().playSongs(playable, 0)
+    if (playable.length) usePlayerStore.getState().playSongs(playable, 0, '搜索结果')
   }
 
   const onPlay = (index: number) => {
@@ -125,7 +125,7 @@ export function SearchPage() {
     const song = songList[index]
     if (!song?.playable) return
     const start = playable.findIndex((t) => t.id === song.id)
-    usePlayerStore.getState().playSongs(playable, Math.max(0, start))
+    usePlayerStore.getState().playSongs(playable, Math.max(0, start), '搜索结果')
   }
 
   const showEmpty = !!q && !loading && !error && items.length === 0

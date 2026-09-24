@@ -44,7 +44,7 @@ export function LikePage() {
     // 播放当前已加载的（分批前缀）可播曲目
     const playable = tracks.filter((t) => t.playable)
     if (!playable.length) return
-    usePlayerStore.getState().playSongs(playable, 0)
+    usePlayerStore.getState().playSongs(playable, 0, '我喜欢的音乐')
   }
 
   const onPlay = (index: number) => {
@@ -52,7 +52,7 @@ export function LikePage() {
     const song = tracks[index]
     if (!song?.playable) return
     const start = playable.findIndex((t) => t.id === song.id)
-    usePlayerStore.getState().playSongs(playable, Math.max(0, start))
+    usePlayerStore.getState().playSongs(playable, Math.max(0, start), '我喜欢的音乐')
   }
 
   const onToggleLike = (song: SongSummary) => {

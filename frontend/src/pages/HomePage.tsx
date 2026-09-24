@@ -72,7 +72,7 @@ export function HomePage() {
     const song = recents[index]
     if (!song?.playable) return
     const start = playable.findIndex((t) => t.id === song.id)
-    usePlayerStore.getState().playSongs(playable, Math.max(0, start))
+    usePlayerStore.getState().playSongs(playable, Math.max(0, start), '最近播放')
   }
 
   return (

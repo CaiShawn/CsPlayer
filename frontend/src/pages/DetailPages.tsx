@@ -52,7 +52,7 @@ export function PlaylistPage() {
   const playAll = () => {
     const playable = detail.tracks.filter((t) => t.playable)
     if (!playable.length) return
-    usePlayerStore.getState().playSongs(playable, 0)
+    usePlayerStore.getState().playSongs(playable, 0, `歌单《${detail.name}》`)
   }
 
   const onPlay = (index: number) => {
@@ -60,7 +60,7 @@ export function PlaylistPage() {
     const song = detail.tracks[index]
     if (!song?.playable) return
     const start = playable.findIndex((t) => t.id === song.id)
-    usePlayerStore.getState().playSongs(playable, Math.max(0, start))
+    usePlayerStore.getState().playSongs(playable, Math.max(0, start), `歌单《${detail.name}》`)
   }
 
   return (
@@ -138,7 +138,7 @@ export function AlbumPage() {
   const playAll = () => {
     const playable = detail.tracks.filter((t) => t.playable)
     if (!playable.length) return
-    usePlayerStore.getState().playSongs(playable, 0)
+    usePlayerStore.getState().playSongs(playable, 0, `专辑《${detail.name}》`)
   }
 
   const onPlay = (index: number) => {
@@ -146,7 +146,7 @@ export function AlbumPage() {
     const song = detail.tracks[index]
     if (!song?.playable) return
     const start = playable.findIndex((t) => t.id === song.id)
-    usePlayerStore.getState().playSongs(playable, Math.max(0, start))
+    usePlayerStore.getState().playSongs(playable, Math.max(0, start), `专辑《${detail.name}》`)
   }
 
   return (
