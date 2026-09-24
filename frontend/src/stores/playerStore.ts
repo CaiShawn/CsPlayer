@@ -37,6 +37,9 @@ export const QUALITY_LABEL: Record<QualityLevel, string> = {
 interface PlayerState {
   queue: SongSummary[]
   currentIndex: number
+  /** 队列内容版本号：任何队列改写（换源/增删/排序）+1；
+   *  topUpQueue 补全替换前校验，避免覆盖用户中途的队列操作 */
+  queueEpoch: number
   /** 队列来源标签（A2）：如「歌单《X》」，面板标题下展示；'' = 未知 */
   queueSource: string
   playing: boolean
@@ -56,6 +59,9 @@ interface PlayerState {
 
   currentSong: () => SongSummary | null
   playSongs: (list: SongSummary[], startIndex: number, source?: string) => void
+  /** 「播放全部」后台补全：全量到位后原位扩展队列（epoch 未变才替换），
+   *  保持当前曲/进度/播放状态不打断（不 bump loadToken） */
+  topUpQueue: (list: SongSummary[], epoch: number) => void
   enqueue: (list: SongSummary[]) => void
   /** 「下一首播放」：插入到当前曲之后（不带去重，可重复插入） */
   insertNext: (list: SongSummary[]) => void
@@ -235,6 +241,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   queue: queueSession?.queue ?? [],
   queueSource: queueSession?.source ?? '',
   currentIndex: queueSession?.currentIndex ?? -1,
+  queueEpoch: 0,
   // 「刷新后自动播放」开启且有恢复队列时：刷新即自动继续播放（从原进度）
   playing: !!queueSession && useSettingsStore.getState().prefs.playback.autoPlayOnRestore,
   playMode: 'list-loop',
@@ -263,6 +270,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       queue: tracks,
       queueSource: source ?? '',
       currentIndex: tracks.length ? idx : -1,
+      queueEpoch: get().queueEpoch + 1,
       playing: tracks.length > 0,
       currentTime: 0,
       duration: 0,
@@ -272,23 +280,33 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     })
   },
 
+  topUpQueue: (list, epoch) => {
+    const s = get()
+    if (s.queueEpoch !== epoch || !list.length || s.currentIndex < 0) return
+    const cur = s.queue[s.currentIndex]
+    const idx = cur ? list.findIndex((t) => t.id === cur.id) : -1
+    // 当前曲不在全量列表里（期间被取消红心等）：放弃补全，保留现状
+    if (idx < 0) return
+    set({ queue: list, currentIndex: idx })
+  },
+
   enqueue: (list) => {
     const { queue } = get()
     const existing = new Set(queue.map((s) => s.id))
     const merged = [...queue, ...list.filter((s) => !existing.has(s.id))]
-    set({ queue: merged })
+    set({ queue: merged, queueEpoch: get().queueEpoch + 1 })
   },
 
   insertNext: (list) => {
     if (!list.length) return
     const { queue, currentIndex } = get()
     if (currentIndex < 0 || queue.length === 0) {
-      set({ queue: [...queue, ...list] })
+      set({ queue: [...queue, ...list], queueEpoch: get().queueEpoch + 1 })
       return
     }
     const merged = [...queue]
     merged.splice(currentIndex + 1, 0, ...list)
-    set({ queue: merged })
+    set({ queue: merged, queueEpoch: get().queueEpoch + 1 })
   },
 
   next: () => {
@@ -386,12 +404,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const queue = s.queue.filter((_, i) => i !== index)
     let currentIndex = s.currentIndex
     let loadToken = s.loadToken
+    const queueEpoch = s.queueEpoch + 1
     if (index === s.currentIndex) {
       currentIndex = Math.min(s.currentIndex, queue.length - 1)
       if (currentIndex < 0) {
         set({
           queue,
           currentIndex: -1,
+          queueEpoch,
           playing: false,
           currentTime: 0,
           duration: 0,
@@ -407,6 +427,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       set({
         queue,
         currentIndex,
+        queueEpoch,
         loadToken,
         currentTime: 0,
         duration: 0,
@@ -417,7 +438,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     } else if (index < s.currentIndex) {
       currentIndex = s.currentIndex - 1
     }
-    set({ queue, currentIndex, loadToken })
+    set({ queue, currentIndex, queueEpoch, loadToken })
   },
 
   moveInQueue: (from, to) => {
@@ -437,7 +458,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         currentIndex = i
       }
     }
-    set({ queue, currentIndex })
+    set({ queue, currentIndex, queueEpoch: s.queueEpoch + 1 })
   },
 
   clearQueue: () =>
@@ -445,6 +466,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       queue: [],
       queueSource: '',
       currentIndex: -1,
+      queueEpoch: s.queueEpoch + 1,
       playing: false,
       currentTime: 0,
       duration: 0,
