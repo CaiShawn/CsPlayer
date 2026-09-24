@@ -29,6 +29,8 @@ interface LikesState {
   hasMore: boolean
   /** 续拉下一批中（滚动加载指示） */
   loadingMore: boolean
+  /** 续拉失败信息（非空 = 断链，停止自动续拉等用户重试；401 自愈后由 guard 复位） */
+  loadMoreError: string
   /** 最近一次加载/刷新失败信息（有缓存时仅顶部错误条提示） */
   tracksError: string
   /** 后台静默刷新中（不阻塞渲染） */
@@ -39,6 +41,7 @@ interface LikesState {
   fetchTracks: (dataVersion: number) => Promise<void>
   fetchMoreTracks: (dataVersion: number) => Promise<void>
   fetchAllTracks: (dataVersion: number) => Promise<SongSummary[]>
+  retryLoadMore: (dataVersion: number) => Promise<void>
   toggle: (song: SongSummary) => Promise<boolean>
   clear: () => void
 }
@@ -52,6 +55,7 @@ const EMPTY = {
   total: 0,
   hasMore: false,
   loadingMore: false,
+  loadMoreError: '',
   tracksError: '',
   refreshing: false,
 }
@@ -123,7 +127,7 @@ export const useLikesStore = create<LikesState>((set, get) => {
     fetchMoreTracks: async (dataVersion) => {
       const s = get()
       if (s.version !== dataVersion) return
-      if (!s.tracksLoaded || !s.hasMore || s.loadingMore) return
+      if (!s.tracksLoaded || !s.hasMore || s.loadingMore || s.loadMoreError) return
       set({ loadingMore: true })
       try {
         // offset = 已加载数：与服务端「我喜欢」歌单顺序一致（新红心入头顶层）
@@ -132,17 +136,28 @@ export const useLikesStore = create<LikesState>((set, get) => {
         const items = data.tracks || []
         const known = new Set(get().tracks.map((t) => t.id))
         const append = items.filter((t) => !known.has(t.id))
+        // 零进展防护：无新条目时 offset 不会推进，不终止会被连续加载链
+        // 以同一 offset 无限重打（2026-09 401 风暴根因之一），按到尾处理
         set({
           tracks: [...get().tracks, ...append],
           total: data.total || get().total,
-          hasMore: !!data.hasMore,
+          hasMore: append.length > 0 && !!data.hasMore,
           loadingMore: false,
         })
       } catch (e) {
         if (get().version !== dataVersion) return
-        set({ loadingMore: false })
-        useUiStore.getState().setToast(e instanceof Error ? e.message : '加载更多失败')
+        // 断链（401 风暴根因之二）：失败不自动重试（enabled 随之为 false，
+        // 观察器停发），哨兵位展示错误 + 重试；401 自愈后 guard 复位并整页重拉
+        set({
+          loadingMore: false,
+          loadMoreError: e instanceof Error ? e.message : '加载更多失败',
+        })
       }
+    },
+
+    retryLoadMore: async (dataVersion) => {
+      set({ loadMoreError: '' })
+      await get().fetchMoreTracks(dataVersion)
     },
 
     /** 「播放全部」后台补全用：一次性取回全量曲目（分批 FETCH_ALL_LIMIT 续拉，走服务端增量缓存）。

@@ -16,11 +16,13 @@ export function LikePage() {
   const total = useLikesStore((s) => s.total)
   const hasMore = useLikesStore((s) => s.hasMore)
   const loadingMore = useLikesStore((s) => s.loadingMore)
+  const loadMoreError = useLikesStore((s) => s.loadMoreError)
   const ids = useLikesStore((s) => s.ids)
   const fetchIds = useLikesStore((s) => s.fetchIds)
   const fetchTracks = useLikesStore((s) => s.fetchTracks)
   const fetchMoreTracks = useLikesStore((s) => s.fetchMoreTracks)
   const fetchAllTracks = useLikesStore((s) => s.fetchAllTracks)
+  const retryLoadMore = useLikesStore((s) => s.retryLoadMore)
   const setToast = useUiStore((s) => s.setToast)
   const toggle = useLikesStore((s) => s.toggle)
 
@@ -34,10 +36,10 @@ export function LikePage() {
     void fetchIds(dataVersion)
   }, [dataVersion, fetchTracks, fetchIds])
 
-  // 分批加载：滚动到底自动续拉后 30 首
+  // 分批加载：滚动到底自动续拉下一批；失败断链（loadMoreError）停发，待手动重试
   const sentinelRef = useInfiniteScroll(
     () => void fetchMoreTracks(dataVersion),
-    tracksLoaded && hasMore && !loadingMore,
+    tracksLoaded && hasMore && !loadingMore && !loadMoreError,
   )
 
   // 曲目数：ids 为全量红心集合（拉全前 total 为上游 hint）
@@ -128,7 +130,17 @@ export function LikePage() {
             整体留白不变（哨兵上沿仍在列表底部，滚动触发时机不受影响） */}
         {tracksLoaded && hasMore && (
           <div ref={sentinelRef} className="-mb-28 flex h-36 items-center justify-center">
-            {loadingMore && <LoadingMore />}
+            {loadingMore ? (
+              <LoadingMore />
+            ) : loadMoreError ? (
+              <button
+                type="button"
+                onClick={() => void retryLoadMore(dataVersion)}
+                className="rounded-full border border-neutral-700 px-4 py-1.5 text-xs text-neutral-300 hover:bg-neutral-800"
+              >
+                {loadMoreError} · 点击重试
+              </button>
+            ) : null}
           </div>
         )}
       </div>
