@@ -221,7 +221,7 @@ export function QueuePanel() {
   return (
     <div
       ref={panelRef}
-      className="fixed bottom-20 right-0 top-16 z-50 flex w-80 flex-col border-l border-neutral-800 bg-[var(--surface-panel)] shadow-2xl"
+      className="fixed bottom-20 right-0 top-16 z-50 flex w-80 flex-col border-l border-neutral-800 bg-neutral-950 shadow-2xl"
     >
       <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
         <div className="min-w-0">
