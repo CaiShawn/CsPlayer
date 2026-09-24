@@ -5,10 +5,10 @@ import { artistNames } from '../../utils/format'
 import { Cover } from '../common/Cover'
 import { PlayModeButton, ProgressBar, QualitySelector, VolumeControl } from './Controls'
 
-/** 暂停图案：自绘双竖条（比文字符号 ⏸ 更粗更醒目，高 18px / 条宽 3.6px） */
+/** 暂停图案：自绘双竖条（比文字符号 ⏸ 更粗更醒目；整体 22px，条宽 4.4px） */
 function PauseIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden>
+    <svg width="22" height="22" viewBox="0 0 18 18" fill="currentColor" aria-hidden>
       <rect x="4.5" y="2.5" width="3.6" height="13" rx="1.2" />
       <rect x="9.9" y="2.5" width="3.6" height="13" rx="1.2" />
     </svg>
