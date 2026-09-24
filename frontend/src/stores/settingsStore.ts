@@ -44,6 +44,22 @@ export interface LyricPrefs {
   highlightCurrent: boolean
 }
 
+/** 自定义背景偏好（S4，设计 §4.5）；独立 key 持久化：csplayer:prefs:background */
+export interface BackgroundPrefs {
+  enabled: boolean
+  /** 压缩后 JPEG dataURL；'' = 无图 */
+  image: string
+  /** 不透明度 0–100（默认 40） */
+  opacity: number
+  /** 模糊 0–40px（默认 0） */
+  blur: number
+  /** 缩放 100–300%（默认 100） */
+  scale: number
+  /** 平移（px，相对居中；双击复位为 0） */
+  x: number
+  y: number
+}
+
 export interface Prefs {
   appearance: AppearancePrefs
   playback: PlaybackPrefs
@@ -60,6 +76,9 @@ export const QUEUE_SESSION_KEY = 'csplayer:queue'
 /** 右键菜单配置独立存储（设计 §2.2），schema 损坏时回落默认布局 */
 export const CONTEXT_MENU_KEY = 'csplayer:prefs:contextMenu'
 export const CONTEXT_MENU_VERSION = 1
+/** 背景图独立存储（设计 §4.5，不进 PREFS_KEY 主信封） */
+export const BACKGROUND_KEY = 'csplayer:prefs:background'
+export const BACKGROUND_VERSION = 1
 
 export const DEFAULT_PREFS: Prefs = {
   appearance: {
@@ -81,6 +100,16 @@ export const DEFAULT_PREFS: Prefs = {
     highlightCurrent: true,
   },
   contextMenu: defaultContextMenuPrefs(),
+}
+
+export const DEFAULT_BACKGROUND: BackgroundPrefs = {
+  enabled: false,
+  image: '',
+  opacity: 40,
+  blur: 0,
+  scale: 100,
+  x: 0,
+  y: 0,
 }
 
 interface StoredPrefs extends Prefs {
@@ -105,6 +134,58 @@ function readContextMenuPrefs(): ContextMenuPrefs {
   } catch {
     return defaultContextMenuPrefs()
   }
+}
+
+function clampNum(v: unknown, min: number, max: number, fallback: number): number {
+  const n = typeof v === 'number' && Number.isFinite(v) ? v : fallback
+  return Math.max(min, Math.min(max, n))
+}
+
+/** 背景偏好独立读取：损坏 / 非法内容静默回默认（设计 S4-1） */
+function readBackgroundPrefs(): BackgroundPrefs {
+  try {
+    const raw = localStorage.getItem(BACKGROUND_KEY)
+    if (!raw) return { ...DEFAULT_BACKGROUND }
+    const p = JSON.parse(raw) as Partial<BackgroundPrefs>
+    return {
+      enabled: p.enabled === true,
+      image: typeof p.image === 'string' && p.image.startsWith('data:image/') ? p.image : '',
+      opacity: clampNum(p.opacity, 0, 100, DEFAULT_BACKGROUND.opacity),
+      blur: clampNum(p.blur, 0, 40, DEFAULT_BACKGROUND.blur),
+      scale: clampNum(p.scale, 100, 300, DEFAULT_BACKGROUND.scale),
+      x: clampNum(p.x, -4000, 4000, 0),
+      y: clampNum(p.y, -4000, 4000, 0),
+    }
+  } catch {
+    return { ...DEFAULT_BACKGROUND }
+  }
+}
+
+function saveBackgroundNow(bg: BackgroundPrefs): boolean {
+  try {
+    localStorage.setItem(BACKGROUND_KEY, JSON.stringify({ version: BACKGROUND_VERSION, ...bg }))
+    return true
+  } catch {
+    // 存储满 / 被禁用：静默失败（调用方提示「存储空间不足」），内存态继续生效
+    return false
+  }
+}
+
+/** 滑杆 / 拖拽高频变更时防抖持久化（含大图 dataURL，避免每次 pointermove 全量写） */
+let bgSaveTimer: number | null = null
+function scheduleBackgroundSave(bg: BackgroundPrefs): void {
+  if (bgSaveTimer !== null) window.clearTimeout(bgSaveTimer)
+  bgSaveTimer = window.setTimeout(() => {
+    bgSaveTimer = null
+    saveBackgroundNow(bg)
+  }, 200)
+}
+
+function flushBackgroundSave(bg: BackgroundPrefs): void {
+  if (bgSaveTimer === null) return
+  window.clearTimeout(bgSaveTimer)
+  bgSaveTimer = null
+  saveBackgroundNow(bg)
 }
 
 /** 读取 prefs；版本不兼容 / 内容损坏时重置为默认并把旧内容备份到 PREFS_BACKUP_KEY。 */
@@ -172,9 +253,17 @@ export function applyAppearance(appearance: AppearancePrefs): void {
 
 interface SettingsState {
   prefs: Prefs
+  /** 背景偏好（独立 key 持久化，不进 prefs 主信封） */
+  background: BackgroundPrefs
   updateAppearance: (patch: Partial<AppearancePrefs>) => void
   updatePlayback: (patch: Partial<PlaybackPrefs>) => void
   updateLyric: (patch: Partial<LyricPrefs>) => void
+  /** 背景参数变更（滑杆 / 拖拽 / 开关）：即时生效 + 防抖持久化 */
+  updateBackground: (patch: Partial<BackgroundPrefs>) => void
+  /** 设置背景图（压缩后 dataURL）：立即持久化，失败返回 false（调用方提示） */
+  setBackgroundImage: (image: string) => boolean
+  /** 移除背景图（保留其他参数） */
+  removeBackgroundImage: () => void
   /** 右键菜单：勾选显示 / 隐藏 */
   toggleContextAction: (kind: ContextKind, id: string) => void
   /** 右键菜单：拖拽排序（from/to 为 order 下标） */
@@ -188,9 +277,11 @@ interface SettingsState {
 }
 
 const initialPrefs = loadPrefs()
+const initialBackground = readBackgroundPrefs()
 
-export const useSettingsStore = create<SettingsState>((set) => ({
+export const useSettingsStore = create<SettingsState>((set, get) => ({
   prefs: initialPrefs,
+  background: initialBackground,
 
   updateAppearance: (patch) => {
     const current = useSettingsStore.getState().prefs
@@ -214,6 +305,24 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     const prefs: Prefs = { ...current, lyric: { ...current.lyric, ...patch } }
     savePrefs(prefs)
     set({ prefs })
+  },
+
+  updateBackground: (patch: Partial<BackgroundPrefs>): void => {
+    const background = { ...get().background, ...patch }
+    scheduleBackgroundSave(background)
+    set({ background })
+  },
+
+  setBackgroundImage: (image: string): boolean => {
+    const background = { ...get().background, image }
+    set({ background })
+    return saveBackgroundNow(background)
+  },
+
+  removeBackgroundImage: (): void => {
+    const background = { ...get().background, image: '' }
+    set({ background })
+    saveBackgroundNow(background)
   },
 
   toggleContextAction: (kind, id) => {
@@ -261,7 +370,9 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     const prefs = mergePrefs(undefined)
     applyAppearance(prefs.appearance)
     savePrefs(prefs)
-    set({ prefs })
+    // 背景偏好属偏好非凭证：「恢复默认」一并清除（设计 §4.5）
+    removeKey(localStorage, BACKGROUND_KEY)
+    set({ prefs, background: { ...DEFAULT_BACKGROUND } })
   },
 
   clearLocalData: () => {
@@ -274,9 +385,14 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     const prefs = mergePrefs(undefined)
     applyAppearance(prefs.appearance)
     savePrefs(prefs)
-    set({ prefs })
+    set({ prefs, background: { ...DEFAULT_BACKGROUND } })
   },
 }))
+
+// 关页 / 刷新前兜底持久化待写入的背景偏好（防抖窗口内丢失）
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => flushBackgroundSave(useSettingsStore.getState().background))
+}
 
 // 启动即应用主题色 / 密度 / 圆角
 applyAppearance(initialPrefs.appearance)

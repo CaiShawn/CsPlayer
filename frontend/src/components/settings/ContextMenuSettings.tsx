@@ -65,7 +65,7 @@ export function ContextMenuSettings() {
           </button>
         </div>
 
-        <div className="mt-3 space-y-1">
+        <div className="mt-3 space-y-2">
           {group.order.map((id, index) => {
             const action = actionById(id)
             if (!action) return null

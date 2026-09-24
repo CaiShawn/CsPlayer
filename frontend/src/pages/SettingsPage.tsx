@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { usePlayerStore } from '../stores/playerStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { ColorPicker } from '../components/settings/ColorPicker'
-import { AccountsSettings } from '../components/settings/AccountsSettings'
+import { AccountsSettings, SubTitle } from '../components/settings/AccountsSettings'
+import { BackgroundSettings } from '../components/settings/BackgroundSettings'
 import { ContextMenuSettings } from '../components/settings/ContextMenuSettings'
 import { InfoButton } from '../components/settings/InfoModal'
 import { Segmented, SettingRow, SettingSection, Switch } from '../components/settings/controls'
@@ -11,11 +12,11 @@ import { APP_VERSION } from '../version'
 
 const GROUPS = [
   { id: 'appearance', label: '外观' },
+  { id: 'background', label: '背景' },
   { id: 'playback', label: '播放' },
   { id: 'lyric', label: '歌词' },
   { id: 'contextMenu', label: '右键菜单' },
-  { id: 'accounts', label: '账号凭证' },
-  { id: 'cache', label: '缓存' },
+  { id: 'storage', label: '存储' },
   { id: 'about', label: '关于' },
 ]
 
@@ -149,6 +150,9 @@ export function SettingsPage() {
           </SettingRow>
         </SettingSection>
 
+        {/* 背景（v0.1.6）：排「外观」之后（设计 §4.5） */}
+        <BackgroundSettings />
+
         {/* 播放 */}
         <SettingSection id="playback" title="播放" desc="音量记忆、不可播放行为与队列恢复">
           <SettingRow label="记住音量" hint="启动时恢复上次音量">
@@ -240,49 +244,62 @@ export function SettingsPage() {
         {/* 右键菜单 */}
         <ContextMenuSettings />
 
-        {/* 账号凭证（v0.1.5） */}
-        <AccountsSettings />
+        {/* 存储（v0.1.6 合并：账号凭证 + 本地数据，框中框结构同右键菜单） */}
+        <SettingSection id="storage" title="存储" desc="登录凭证与本地数据，均保存在本机浏览器">
+          <AccountsSettings />
 
-        {/* 缓存 */}
-        <SettingSection id="cache" title="缓存" desc="本地数据占用与重置">
-          <SettingRow
-            label="本地数据占用"
-            hint={`偏好与队列快照约 ${usageKb} KB（队列 ${queueLength} 首）；图片缓存由浏览器管理，无法精确统计`}
-          >
-            <button
-              type="button"
-              onClick={refreshUsage}
-              className="rounded-full border border-neutral-700 bg-neutral-900 px-4 py-1.5 text-xs text-neutral-200 hover:border-accent/50 hover:text-accent-soft"
-            >
-              重新统计
-            </button>
-          </SettingRow>
-          <SettingRow label="恢复默认" hint="仅重置全部偏好设置为默认值">
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm('将全部偏好恢复为默认值，继续？')) {
-                  resetPrefs()
-                  refreshUsage()
-                }
-              }}
-              className="rounded-full border border-neutral-700 bg-neutral-900 px-4 py-1.5 text-xs text-neutral-200 hover:border-accent/50 hover:text-accent-soft"
-            >
-              恢复默认
-            </button>
-          </SettingRow>
-          <SettingRow
-            label="清除本地数据"
-            hint="偏好、队列快照等一次清空（不可恢复）；播放队列同时清空，不影响「账号凭证」中的登录凭证"
-          >
-            <button
-              type="button"
-              onClick={onClearLocalData}
-              className="rounded-full border border-red-500/40 bg-neutral-900 px-4 py-1.5 text-xs text-red-400 hover:border-red-400 hover:bg-red-500/10"
-            >
-              清除本地数据
-            </button>
-          </SettingRow>
+          {/* 本地数据：右键菜单同款多行设置卡（文本块 + 按钮右对齐） */}
+          <div className="mt-6 rounded-xl border border-neutral-800 bg-neutral-900/40 px-4 py-4">
+            {/* 头部：标题（左） / 清除本地数据（右上） */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <SubTitle>本地数据</SubTitle>
+              <button
+                type="button"
+                onClick={onClearLocalData}
+                title="偏好、队列快照等一次清空（不可恢复）；播放队列同时清空，不影响上方的登录凭证"
+                className="rounded-full border border-red-500/40 bg-neutral-900 px-4 py-1.5 text-xs text-red-400 hover:border-red-400 hover:bg-red-500/10"
+              >
+                清除本地数据
+              </button>
+            </div>
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-950/40 px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm text-neutral-100">
+                    本地数据占用 · 约 {usageKb} KB（队列 {queueLength} 首）
+                  </div>
+                  <div className="mt-0.5 text-xs text-neutral-500">
+                    重新统计即时刷新；图片缓存由浏览器管理，无法精确统计
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={refreshUsage}
+                  className="ml-auto shrink-0 rounded-full border border-neutral-700 bg-neutral-900 px-4 py-1.5 text-xs text-neutral-200 hover:border-accent/50 hover:text-accent-soft"
+                >
+                  重新统计
+                </button>
+              </div>
+              <div className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-950/40 px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm text-neutral-100">恢复默认</div>
+                  <div className="mt-0.5 text-xs text-neutral-500">仅重置全部偏好设置为默认值</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('将全部偏好恢复为默认值，继续？')) {
+                      resetPrefs()
+                      refreshUsage()
+                    }
+                  }}
+                  className="ml-auto shrink-0 rounded-full border border-neutral-700 bg-neutral-900 px-4 py-1.5 text-xs text-neutral-200 hover:border-accent/50 hover:text-accent-soft"
+                >
+                  恢复默认
+                </button>
+              </div>
+            </div>
+          </div>
         </SettingSection>
 
         {/* 关于 */}

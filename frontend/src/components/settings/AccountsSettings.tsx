@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import {
   clearAccounts,
@@ -6,7 +6,37 @@ import {
   sortAccountsByRecent,
   type SavedAccount,
 } from '../../utils/cred'
-import { SettingRow, SettingSection } from './controls'
+import { InfoButton } from './InfoModal'
+
+/** 存储卡内的小标题（账号凭证 / 本地数据）；extra 放 ⓘ 说明入口 */
+export function SubTitle({
+  children,
+  extra,
+}: {
+  children: ReactNode
+  extra?: ReactNode
+}) {
+  return (
+    <div className="flex items-center gap-1.5 pb-1 text-sm font-medium text-neutral-200">
+      {children}
+      {extra}
+    </div>
+  )
+}
+
+/** 「凭证说明」ⓘ 弹窗内容 */
+export function AccountsHelp() {
+  return (
+    <>
+      <div>凭证保存在本机浏览器（localStorage），不上传后端；移除后需重新扫码。</div>
+      <div>
+        「清除本地数据」只清偏好与队列快照，
+        <span className="text-neutral-200">不影响这里的凭证</span>
+        ；凭证的清除入口只有右上「清除全部凭证」与「退出登录」。
+      </div>
+    </>
+  )
+}
 
 function formatUsedAt(ts: number): string {
   try {
@@ -17,8 +47,8 @@ function formatUsedAt(ts: number): string {
 }
 
 /**
- * 设置 · 「账号凭证」卡（v0.1.5 §5.3）：本机凭证库的查看 / 单个移除 / 一键清空。
- * 「缓存 → 清除本地数据」只清 csplayer: 前缀偏好/队列，不动这里的凭证库（§3.7）。
+ * 设置 · 「存储 → 账号凭证」块（v0.1.5 §5.3）：本机凭证库的查看 / 单个移除 / 一键清空。
+ * 「存储 → 本地数据」的清除只清 csplayer: 前缀偏好/队列，不动这里的凭证库（§3.7）。
  */
 export function AccountsSettings() {
   const user = useAuthStore((s) => s.user)
@@ -62,19 +92,42 @@ export function AccountsSettings() {
   }
 
   return (
-    <SettingSection id="accounts" title="账号凭证" desc="本机保存的登录凭证管理">
+    <div className="mt-6 rounded-xl border border-neutral-800 bg-neutral-900/40 px-4 py-4 first:mt-0">
+      {/* 头部：标题 + ⓘ（左） / 清除全部凭证（右上） */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SubTitle
+          extra={
+            <InfoButton title="凭证说明" label="查看凭证保存与清除说明">
+              <AccountsHelp />
+            </InfoButton>
+          }
+        >
+          账号凭证
+        </SubTitle>
+        <button
+          type="button"
+          onClick={() => void onClearAll()}
+          disabled={rows.length === 0}
+          title="移除所有已保存账号（当前账号退出登录并吊销凭证），下次启动需重新扫码"
+          className="rounded-full border border-red-500/40 bg-neutral-900 px-4 py-1.5 text-xs text-red-400 hover:border-red-400 hover:bg-red-500/10 disabled:opacity-50"
+        >
+          清除全部凭证
+        </button>
+      </div>
+
+      {/* 内框：账号列表 */}
       {rows.length === 0 ? (
-        <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 px-4 py-4 text-xs text-neutral-500">
+        <div className="mt-3 rounded-lg border border-neutral-800 bg-neutral-950/40 px-3 py-4 text-xs text-neutral-500">
           暂无已保存账号；扫码登录后凭证会保存在本机，切换账号免扫码。
         </div>
       ) : (
-        <div className="space-y-1">
+        <div className="mt-3 space-y-2">
           {rows.map((account) => {
             const isCurrent = account.userId === user?.userId || account.userId === activeId
             return (
               <div
                 key={account.userId}
-                className="flex items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 px-4 py-3"
+                className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-950/40 px-3 py-2"
               >
                 {account.avatarUrl ? (
                   <img
@@ -115,26 +168,6 @@ export function AccountsSettings() {
           })}
         </div>
       )}
-
-      <SettingRow
-        label="清除全部凭证"
-        hint="移除所有已保存账号（当前账号退出登录并吊销凭证），下次启动需重新扫码"
-      >
-        <button
-          type="button"
-          onClick={() => void onClearAll()}
-          disabled={rows.length === 0}
-          className="rounded-full border border-red-500/40 bg-neutral-900 px-4 py-1.5 text-xs text-red-400 hover:border-red-400 hover:bg-red-500/10 disabled:opacity-50"
-        >
-          清除全部凭证
-        </button>
-      </SettingRow>
-
-      <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 px-4 py-3 text-xs leading-5 text-neutral-500">
-        凭证保存在本机浏览器（localStorage），不上传后端；移除后需重新扫码。
-        「缓存 → 清除本地数据」只清偏好与队列快照，<span className="text-neutral-400">不影响这里的凭证</span>
-        ；凭证的清除入口只有本卡与「退出登录」。
-      </div>
-    </SettingSection>
+    </div>
   )
 }

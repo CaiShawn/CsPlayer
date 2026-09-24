@@ -102,13 +102,26 @@ export function TopBar() {
   }, [menuOpen])
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-4 border-b border-neutral-800 bg-neutral-950 px-4">
-      <div className="min-w-0 select-none">
+    <header className="flex h-14 shrink-0 items-center gap-4 border-b border-neutral-800 bg-[var(--surface-bar)] px-4">
+      {/* 品牌区可点击回首页（S1-1）：已在首页则回顶，避免拖选文字（select-none） */}
+      <button
+        type="button"
+        aria-label="回到首页"
+        title="回到首页"
+        onClick={() => {
+          if (location.pathname === '/home') {
+            document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
+          } else {
+            navigate('/home')
+          }
+        }}
+        className="min-w-0 select-none rounded-md px-1 py-0.5 text-left transition-colors hover:bg-neutral-900"
+      >
         <div className="text-base font-semibold tracking-wide text-accent-text">CsPlayer</div>
         <div className="truncate text-[10px] leading-3 text-neutral-500">
           Third-party web player for NCM
         </div>
-      </div>
+      </button>
 
       <div ref={searchWrapRef} className="relative mx-auto w-full max-w-md">
         <form

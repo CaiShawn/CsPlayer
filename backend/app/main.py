@@ -91,7 +91,7 @@ class PerfLogMiddleware:
             )
 
 
-app = FastAPI(title="CsPlayer", version="0.1.5")
+app = FastAPI(title="CsPlayer", version="0.1.6")
 
 app.add_middleware(
     CORSMiddleware,

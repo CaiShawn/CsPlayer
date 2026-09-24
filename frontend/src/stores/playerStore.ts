@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Lyric, PlayMode, QualityLevel, SongSummary } from '../types'
 import { findLyricIndex } from '../utils/lyric'
+import { pushRecentPlay } from '../utils/recentPlays'
 import { QUEUE_SESSION_KEY, VOLUME_KEY, useSettingsStore } from './settingsStore'
 
 const emptyLyric: Lyric = { lrc: [], tlyric: [], hasTime: true }
@@ -69,6 +70,7 @@ interface PlayerState {
   setLyric: (lyric: Lyric) => void
   syncLyricIndex: (timeSec: number) => void
   toggleQueue: () => void
+  setQueueVisible: (v: boolean) => void
   toggleLyric: () => void
   setLyricCollapsed: (v: boolean) => void
   handleEnded: () => void
@@ -403,6 +405,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   toggleQueue: () => set({ queueVisible: !get().queueVisible }),
+  setQueueVisible: (v) => {
+    if (get().queueVisible !== v) set({ queueVisible: v })
+  },
   toggleLyric: () => set({ lyricCollapsed: !get().lyricCollapsed }),
   setLyricCollapsed: (v) => set({ lyricCollapsed: v }),
 
@@ -479,6 +484,16 @@ usePlayerStore.subscribe((state, prev) => {
     lastSessionWrite = now
     writeQueueSession()
   }
+})
+
+// 曲目开始播放（换曲 / 选曲）时写最近播放（S3-2，设计 §4.4）：
+// loadToken 递增 = 加载新曲；同曲重载（切音质）不重复记录。
+// 同曲去重置顶、上限 50 由 recentPlays 保证。
+usePlayerStore.subscribe((state, prev) => {
+  if (state.loadToken === prev.loadToken) return
+  if (state.queue === prev.queue && state.currentIndex === prev.currentIndex) return
+  const song = state.currentSong()
+  if (song) pushRecentPlay(song)
 })
 
 // 刷新 / 关页前兜底写一次最终进度（补偿节流漏掉的最后一段）

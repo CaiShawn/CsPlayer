@@ -113,6 +113,7 @@ export function ContextMenu() {
       ref={ref}
       role="menu"
       tabIndex={-1}
+      data-cs-context-menu
       style={{ left: pos.left, top: pos.top }}
       className="fixed z-[100] min-w-[200px] max-w-[280px] rounded-xl border border-neutral-800 bg-neutral-900 py-1 shadow-xl outline-none"
     >

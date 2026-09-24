@@ -16,7 +16,7 @@ export function SettingSection({
     <section id={id} className="scroll-mt-8">
       <h2 className="text-lg font-semibold text-neutral-100">{title}</h2>
       {desc && <p className="mt-1 text-xs text-neutral-500">{desc}</p>}
-      <div className="mt-4 space-y-1">{children}</div>
+      <div className="mt-4 space-y-2">{children}</div>
     </section>
   )
 }

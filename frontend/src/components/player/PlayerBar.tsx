@@ -14,6 +14,7 @@ export function PlayerBar() {
   const next = usePlayerStore((s) => s.next)
   const prev = usePlayerStore((s) => s.prev)
   const toggleQueue = usePlayerStore((s) => s.toggleQueue)
+  const queueVisible = usePlayerStore((s) => s.queueVisible)
   const toggleLyric = usePlayerStore((s) => s.toggleLyric)
 
   const likedIds = useLikesStore((s) => s.ids)
@@ -115,8 +116,14 @@ export function PlayerBar() {
           </button>
           <button
             type="button"
+            data-cs-queue-toggle
             onClick={toggleQueue}
-            className="rounded px-2 py-1 text-sm text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+            title={queueVisible ? '收起队列' : '展开播放队列'}
+            className={`rounded px-2 py-1 text-sm hover:bg-neutral-800 ${
+              queueVisible
+                ? 'text-accent-text hover:text-accent-soft'
+                : 'text-neutral-500 hover:text-neutral-100'
+            }`}
           >
             列
           </button>
