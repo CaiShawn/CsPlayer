@@ -1,3 +1,8 @@
+"""搜索路由（/api/search）。
+
+歌手详情 / 专辑分页（/api/artist/*）已归位 artist.py（service 仍在 search_service）。
+"""
+
 from fastapi import APIRouter, Depends, Query
 
 from ..models.common import ApiResponse, ok
@@ -22,26 +27,5 @@ async def search(
         limit=limit,
         offset=offset,
         scope=str(session["user_id"]),
-    )
-    return ok(data)
-
-
-@router.get("/artist/{artist_id}")
-async def artist_detail(
-    artist_id: int, session: dict = Depends(get_session)
-) -> ApiResponse:
-    detail = await search_service.artist_detail(session["cookie"], artist_id)
-    return ok(detail.model_dump())
-
-
-@router.get("/artist/{artist_id}/albums")
-async def artist_albums(
-    artist_id: int,
-    offset: int = Query(default=0, ge=0),
-    limit: int = Query(default=40, ge=1, le=50),
-    session: dict = Depends(get_session),
-) -> ApiResponse:
-    data = await search_service.artist_albums(
-        session["cookie"], artist_id, offset=offset, limit=limit
     )
     return ok(data)

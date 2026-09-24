@@ -10,10 +10,12 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from .core import ncm_client
 from .core.config import settings
 from .core.logutil import install_logging
+from .routers import artist as artist_router
 from .routers import auth as auth_router
 from .routers import search as search_router
 from .routers import song as song_router
 from .routers import stream as stream_router
+from .routers import user as user_router
 
 logger = logging.getLogger("csplayer.http")
 
@@ -138,4 +140,6 @@ async def health():
 app.include_router(auth_router.router, prefix="/api/auth")
 app.include_router(search_router.router, prefix="/api")
 app.include_router(song_router.router, prefix="/api")
+app.include_router(user_router.router, prefix="/api")
+app.include_router(artist_router.router, prefix="/api")
 app.include_router(stream_router.router, prefix="/api")
