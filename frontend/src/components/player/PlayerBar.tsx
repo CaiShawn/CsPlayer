@@ -63,8 +63,10 @@ export function PlayerBar() {
           )}
         </div>
 
-        {/* transport */}
-        <div className="flex flex-1 flex-col items-center gap-1">
+        {/* transport：右侧占位比左侧多 88px（词/列 72 + gap 差 16），
+            pl-[88px] 补齐后按钮排与主进度条正落在播放条正中（右移 44px）；
+            只加左内边距，时长右缘不动，音量滑条仍在「时长 ↔ 词」正中 */}
+        <div className="flex flex-1 flex-col items-center gap-1 pl-[88px]">
           <div className="flex items-center gap-3">
             <PlayModeButton />
             <button
