@@ -27,18 +27,13 @@ export function HomePage() {
   const dataVersion = useAuthStore((s) => s.dataVersion)
 
   /* 概览数字：异步补数、不阻塞首屏；失败则隐藏该数字（设计 §4.4） */
-  const likesTracks = useLikesStore((s) => s.tracks)
-  const tracksLoaded = useLikesStore((s) => s.tracksLoaded)
   const likedIdsSize = useLikesStore((s) => s.ids.size)
+  const likesTotal = useLikesStore((s) => s.total)
   const [playlistCount, setPlaylistCount] = useState<number | null>(null)
   const [albumCount, setAlbumCount] = useState<number | null>(null)
 
-  // 我喜欢数：复用 likesStore 单一数据源（fetchIds 有缓存短路，失败即隐藏）
-  const likesCount = tracksLoaded
-    ? likesTracks.length
-    : likedIdsSize > 0
-      ? likedIdsSize
-      : null
+  // 我喜欢数：ids 为全量红心集合（v0.1.7 起 tracks 分批加载只是前缀，不可作计数）
+  const likesCount = likedIdsSize > 0 ? likedIdsSize : likesTotal > 0 ? likesTotal : null
 
   useEffect(() => {
     void useLikesStore.getState().fetchIds(dataVersion)

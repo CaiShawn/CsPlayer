@@ -107,9 +107,13 @@ export type QrStatus = 'waiting' | 'scanned' | 'success' | 'expired' | 'rate_lim
 
 export interface LikedSongs {
   playlistId: number
+  /** 当前批次切片（每批 30 首），滚动到底续拉下一批 */
   tracks: SongSummary[]
   /** v0.1.6 起后端不再下发（与 tracks[].id 全量冗余，前端自 tracks 派生） */
   ids?: number[]
+  /** 全量曲目数（拉全前为上游 trackCount hint） */
+  total: number
+  hasMore: boolean
 }
 
 export interface LikeResult {

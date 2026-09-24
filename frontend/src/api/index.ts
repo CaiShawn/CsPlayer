@@ -42,16 +42,20 @@ export const libraryApi = {
     api.get<{ created: PlaylistBrief[]; subscribed: PlaylistBrief[] }>(
       '/api/user/playlists',
     ),
-  albums: (offset = 0, limit?: number) => {
-    const params = new URLSearchParams({ offset: String(offset) })
-    if (limit != null) params.set('limit', String(limit))
+  /** 收藏专辑分页：每批 30 张，滚动到底续拉（offset=已加载数） */
+  albums: (offset = 0, limit = 30) => {
+    const params = new URLSearchParams({ offset: String(offset), limit: String(limit) })
     return api.get<{ items: AlbumBrief[]; hasMore: boolean; total: number }>(
       `/api/user/albums?${params.toString()}`,
     )
   },
   playlistDetail: (id: number) => api.get<PlaylistDetail>(`/api/playlist/${id}`),
   albumDetail: (id: number) => api.get<AlbumDetail>(`/api/album/${id}`),
-  likes: () => api.get<LikedSongs>('/api/user/likes'),
+  /** 我喜欢分页：每批 30 首，滚动到底续拉（offset=已加载数） */
+  likes: (offset = 0, limit = 30) => {
+    const params = new URLSearchParams({ offset: String(offset), limit: String(limit) })
+    return api.get<LikedSongs>(`/api/user/likes?${params.toString()}`)
+  },
   likedIds: () => api.get<{ ids: number[] }>('/api/user/liked-ids'),
   record: (type: 'all' | 'week' = 'all', limit = 50) =>
     api.get<RecordItem[]>(`/api/user/record?type=${type}&limit=${limit}`),
