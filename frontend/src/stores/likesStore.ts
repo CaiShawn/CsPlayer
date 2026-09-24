@@ -5,6 +5,7 @@ import type { SongSummary } from '../types'
 /* ---------------------------------------------------------------------------
  * likes 单一数据源（S2-3）：SWR 语义 + 分批加载（v0.1.7）
  *   - 分批：首批 30 首，滚动到底 fetchMoreTracks 续拉 30 首（不再一次拉全量）；
+ *     「播放全部」例外：fetchAllTracks 一次性取回全量以整体替换播放队列；
  *   - 二次进入「我喜欢」：缓存立即渲染（<100ms），后台静默刷新「已显示窗口」；
  *   - 刷新失败：保留上次缓存 + 页面顶部错误条 + 重试（不整页打回 Loading）；
  *   - 写操作（红心）：乐观更新本地缓存，失败回滚；
@@ -37,6 +38,7 @@ interface LikesState {
   fetchIds: (dataVersion: number) => Promise<void>
   fetchTracks: (dataVersion: number) => Promise<void>
   fetchMoreTracks: (dataVersion: number) => Promise<void>
+  fetchAllTracks: (dataVersion: number) => Promise<SongSummary[]>
   toggle: (song: SongSummary) => Promise<boolean>
   setToast: (msg: string) => void
   clear: () => void
@@ -145,6 +147,36 @@ export const useLikesStore = create<LikesState>((set, get) => {
           toast: e instanceof Error ? e.message : '加载更多失败',
         })
       }
+    },
+
+    /** 「播放全部」用：一次性取回全量曲目（分批 200 续拉，走服务端增量缓存）。
+     *  不改动 tracks 懒加载窗口（列表仍分批渲染），仅返回完整列表供整体替换播放队列。
+     *  网络失败向上抛出，由调用方提示；期间切账号返回空数组。 */
+    fetchAllTracks: async (dataVersion) => {
+      guard(dataVersion)
+      if (get().version !== dataVersion) return []
+      const all: SongSummary[] = []
+      const known = new Set<number>()
+      const push = (items: SongSummary[]) => {
+        for (const t of items) {
+          if (!known.has(t.id)) {
+            known.add(t.id)
+            all.push(t)
+          }
+        }
+      }
+      // 已加载前缀为底（与服务端歌单顺序一致），续拉剩余部分
+      push(get().tracks)
+      // offset 按服务端返回条数推进（去重不回拨，避免跳条）；单批上限 200
+      for (let offset = get().tracks.length; ; ) {
+        const data = await libraryApi.likes(offset, 200)
+        if (get().version !== dataVersion) return [] // 期间已切账号：丢弃过期结果
+        const items = data.tracks || []
+        push(items)
+        offset += items.length
+        if (!data.hasMore || items.length === 0) break
+      }
+      return all
     },
 
     toggle: async (song) => {

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { SongSummary } from '../types'
 import { Empty, ErrorBar, LoadError, LoadingMore, SongSkeleton } from '../components/common/Ui'
 import { SongTable } from '../components/media/SongTable'
@@ -19,6 +19,8 @@ export function LikePage() {
   const fetchIds = useLikesStore((s) => s.fetchIds)
   const fetchTracks = useLikesStore((s) => s.fetchTracks)
   const fetchMoreTracks = useLikesStore((s) => s.fetchMoreTracks)
+  const fetchAllTracks = useLikesStore((s) => s.fetchAllTracks)
+  const setToast = useLikesStore((s) => s.setToast)
   const toggle = useLikesStore((s) => s.toggle)
 
   const currentId = usePlayerStore((s) =>
@@ -40,11 +42,23 @@ export function LikePage() {
   // 曲目数：ids 为全量红心集合（拉全前 total 为上游 hint）
   const count = ids.size > 0 ? ids.size : total
 
-  const playAll = () => {
-    // 播放当前已加载的（分批前缀）可播曲目
-    const playable = tracks.filter((t) => t.playable)
-    if (!playable.length) return
-    usePlayerStore.getState().playSongs(playable, 0, '我喜欢的音乐')
+  const [loadingAll, setLoadingAll] = useState(false)
+
+  const playAll = async () => {
+    if (loadingAll) return
+    setLoadingAll(true)
+    try {
+      // 播放全部 = 整个「我喜欢」歌单直接替换播放队列（不受懒加载窗口限制）：
+      // 先取回全量曲目再整体替换，不可播曲目照旧过滤（队列遇灰自动跳过）
+      const all = await fetchAllTracks(dataVersion)
+      const playable = all.filter((t) => t.playable)
+      if (!playable.length) return
+      usePlayerStore.getState().playSongs(playable, 0, '我喜欢的音乐')
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : '加载我喜欢失败')
+    } finally {
+      setLoadingAll(false)
+    }
   }
 
   const onPlay = (index: number) => {
@@ -70,11 +84,11 @@ export function LikePage() {
         </div>
         <button
           type="button"
-          onClick={playAll}
-          disabled={!tracks.some((t) => t.playable)}
+          onClick={() => void playAll()}
+          disabled={loadingAll || !tracks.some((t) => t.playable)}
           className="rounded-full bg-accent px-5 py-2 text-sm font-medium text-neutral-950 hover:bg-accent-hover disabled:opacity-40"
         >
-          ▶ 播放全部
+          {loadingAll ? '加载中…' : '▶ 播放全部'}
         </button>
       </div>
 
