@@ -15,12 +15,14 @@ export function ShelfPage() {
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [loadMoreError, setLoadMoreError] = useState('')
   const [error, setError] = useState('')
 
   const load = useCallback(async (offset: number, replace: boolean) => {
     if (replace) {
       setLoading(true)
       setError('')
+      setLoadMoreError('')
     } else {
       setLoadingMore(true)
     }
@@ -29,9 +31,12 @@ export function ShelfPage() {
       const items = data.items || []
       setAlbums((prev) => (replace ? items : [...prev, ...items]))
       setTotal(data.total || 0)
-      setHasMore(!!data.hasMore)
+      // 零进展防护：无新条目时 offset 不会推进，按到尾处理（防连续加载链死循环）
+      setHasMore(items.length > 0 && !!data.hasMore)
     } catch (e) {
       if (replace) setError(e instanceof Error ? e.message : '加载失败')
+      // 断链：续拉失败不自动重试（观察器停发），哨兵位展示错误 + 重试
+      else setLoadMoreError(e instanceof Error ? e.message : '加载更多失败')
     } finally {
       setLoading(false)
       setLoadingMore(false)
@@ -49,13 +54,13 @@ export function ShelfPage() {
     }
   }, [dataVersion, load])
 
-  // 分批加载：滚动到底自动续拉后 30 张
+  // 分批加载：滚动到底自动续拉下一批；失败断链（loadMoreError）停发，待手动重试
   const sentinelRef = useInfiniteScroll(
     () => {
-      if (loadingMore || !hasMore) return
+      if (loadingMore || !hasMore || loadMoreError) return
       void load(albums.length, false)
     },
-    hasMore && !loadingMore,
+    hasMore && !loadingMore && !loadMoreError,
   )
 
   return (
@@ -95,7 +100,17 @@ export function ShelfPage() {
                 整体留白不变（哨兵上沿仍在列表底部，滚动触发时机不受影响） */}
             {hasMore && (
               <div ref={sentinelRef} className="-mb-28 flex h-36 items-center justify-center">
-                {loadingMore && <LoadingMore />}
+                {loadingMore ? (
+                  <LoadingMore />
+                ) : loadMoreError ? (
+                  <button
+                    type="button"
+                    onClick={() => void load(albums.length, false)}
+                    className="rounded-full border border-neutral-700 px-4 py-1.5 text-xs text-neutral-300 hover:bg-neutral-800"
+                  >
+                    {loadMoreError} · 点击重试
+                  </button>
+                ) : null}
               </div>
             )}
           </>
