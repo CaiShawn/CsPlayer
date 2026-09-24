@@ -22,6 +22,9 @@ import type {
   RecordItem,
 } from '../types'
 
+/** 滚动加载单批条数（与后端上游补拉单页 PAGE 对齐，均为 40） */
+export const PAGE_SIZE = 40
+
 export const authApi = {
   qrKey: () => http.post<{ unikey: string }>('/api/auth/qr/key'),
   qrCreate: (unikey: string) =>
@@ -42,8 +45,8 @@ export const libraryApi = {
     api.get<{ created: PlaylistBrief[]; subscribed: PlaylistBrief[] }>(
       '/api/user/playlists',
     ),
-  /** 收藏专辑分页：每批 30 张，滚动到底续拉（offset=已加载数） */
-  albums: (offset = 0, limit = 30) => {
+  /** 收藏专辑分页：每批 PAGE_SIZE 张，滚动到底续拉（offset=已加载数） */
+  albums: (offset = 0, limit = PAGE_SIZE) => {
     const params = new URLSearchParams({ offset: String(offset), limit: String(limit) })
     return api.get<{ items: AlbumBrief[]; hasMore: boolean; total: number }>(
       `/api/user/albums?${params.toString()}`,
@@ -51,8 +54,8 @@ export const libraryApi = {
   },
   playlistDetail: (id: number) => api.get<PlaylistDetail>(`/api/playlist/${id}`),
   albumDetail: (id: number) => api.get<AlbumDetail>(`/api/album/${id}`),
-  /** 我喜欢分页：每批 30 首，滚动到底续拉（offset=已加载数） */
-  likes: (offset = 0, limit = 30) => {
+  /** 我喜欢分页：每批 PAGE_SIZE 首，滚动到底续拉（offset=已加载数） */
+  likes: (offset = 0, limit = PAGE_SIZE) => {
     const params = new URLSearchParams({ offset: String(offset), limit: String(limit) })
     return api.get<LikedSongs>(`/api/user/likes?${params.toString()}`)
   },
@@ -72,7 +75,7 @@ export const songApi = {
 }
 
 export const searchApi = {
-  search: <T>(kw: string, type: SearchType, limit = 30, offset = 0) => {
+  search: <T>(kw: string, type: SearchType, limit = PAGE_SIZE, offset = 0) => {
     const params = new URLSearchParams({
       kw,
       type,
@@ -82,8 +85,8 @@ export const searchApi = {
     return api.get<SearchResult<T>>(`/api/search?${params.toString()}`)
   },
   artist: (id: number) => api.get<ArtistDetail>(`/api/artist/${id}`),
-  /** 歌手专辑分页（歌手页每页 30 张 + 加载更多） */
-  artistAlbums: (id: number, offset = 0, limit = 30) => {
+  /** 歌手专辑分页（歌手页每页 PAGE_SIZE 张 + 加载更多） */
+  artistAlbums: (id: number, offset = 0, limit = PAGE_SIZE) => {
     const params = new URLSearchParams({ offset: String(offset), limit: String(limit) })
     return api.get<SearchResult<AlbumBrief>>(`/api/artist/${id}/albums?${params.toString()}`)
   },

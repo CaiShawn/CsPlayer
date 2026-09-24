@@ -1,10 +1,10 @@
 import { create } from 'zustand'
-import { libraryApi, songApi } from '../api'
+import { PAGE_SIZE, libraryApi, songApi } from '../api'
 import type { SongSummary } from '../types'
 
 /* ---------------------------------------------------------------------------
  * likes 单一数据源（S2-3）：SWR 语义 + 分批加载（v0.1.7）
- *   - 分批：首批 30 首，滚动到底 fetchMoreTracks 续拉 30 首（不再一次拉全量）；
+ *   - 分批：首批 PAGE_SIZE 首，滚动到底 fetchMoreTracks 续拉下一批（不再一次拉全量）；
  *     「播放全部」例外：fetchAllTracks 一次性取回全量以整体替换播放队列；
  *   - 二次进入「我喜欢」：缓存立即渲染（<100ms），后台静默刷新「已显示窗口」；
  *   - 刷新失败：保留上次缓存 + 页面顶部错误条 + 重试（不整页打回 Loading）；
@@ -14,8 +14,8 @@ import type { SongSummary } from '../types'
  *     不再由 tracks 全量派生；仅 likes 已拉全时短路派生（S2-3 去重）。
  * ------------------------------------------------------------------------ */
 
-/** 单批条数（与后端 PAGE 一致） */
-export const LIKES_BATCH = 30
+/** 「播放全部」补全的单批条数（= 后端 /api/user/likes limit 上限） */
+const FETCH_ALL_LIMIT = 200
 
 interface LikesState {
   ids: Set<number>
@@ -96,8 +96,8 @@ export const useLikesStore = create<LikesState>((set, get) => {
       set(warm ? { refreshing: true } : { tracksLoaded: false, tracksError: '', refreshing: true })
       try {
         const loaded = get().tracks.length
-        // 静默刷新只刷「已显示窗口」，冷加载首批 LIKES_BATCH
-        const data = await libraryApi.likes(0, warm ? Math.max(LIKES_BATCH, loaded) : LIKES_BATCH)
+        // 静默刷新只刷「已显示窗口」，冷加载首批 PAGE_SIZE
+        const data = await libraryApi.likes(0, warm ? Math.max(PAGE_SIZE, loaded) : PAGE_SIZE)
         if (get().version !== dataVersion) return // 期间已切账号：丢弃过期结果
         const tracks = data.tracks || []
         // 有 diff 才替换列表（避免无谓重渲染打断滚动/悬停）
@@ -129,7 +129,7 @@ export const useLikesStore = create<LikesState>((set, get) => {
       set({ loadingMore: true })
       try {
         // offset = 已加载数：与服务端「我喜欢」歌单顺序一致（新红心入头顶层）
-        const data = await libraryApi.likes(get().tracks.length, LIKES_BATCH)
+        const data = await libraryApi.likes(get().tracks.length, PAGE_SIZE)
         if (get().version !== dataVersion) return
         const items = data.tracks || []
         const known = new Set(get().tracks.map((t) => t.id))
@@ -149,7 +149,7 @@ export const useLikesStore = create<LikesState>((set, get) => {
       }
     },
 
-    /** 「播放全部」后台补全用：一次性取回全量曲目（分批 200 续拉，走服务端增量缓存）。
+    /** 「播放全部」后台补全用：一次性取回全量曲目（分批 FETCH_ALL_LIMIT 续拉，走服务端增量缓存）。
      *  不改动 tracks 懒加载窗口（列表仍分批渲染），仅返回完整列表供补全播放队列。
      *  网络失败向上抛出，由调用方提示；期间切账号返回空数组。 */
     fetchAllTracks: async (dataVersion) => {
@@ -167,9 +167,9 @@ export const useLikesStore = create<LikesState>((set, get) => {
       }
       // 已加载前缀为底（与服务端歌单顺序一致），续拉剩余部分
       push(get().tracks)
-      // offset 按服务端返回条数推进（去重不回拨，避免跳条）；单批上限 200
+      // offset 按服务端返回条数推进（去重不回拨，避免跳条）
       for (let offset = get().tracks.length; ; ) {
-        const data = await libraryApi.likes(offset, 200)
+        const data = await libraryApi.likes(offset, FETCH_ALL_LIMIT)
         if (get().version !== dataVersion) return [] // 期间已切账号：丢弃过期结果
         const items = data.tracks || []
         push(items)

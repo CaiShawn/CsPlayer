@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { searchApi } from '../api'
+import { PAGE_SIZE, searchApi } from '../api'
 import type {
   AlbumBrief,
   ArtistBrief,
@@ -14,7 +14,6 @@ import { SongTable } from '../components/media/SongTable'
 import { useContextMenuStore } from '../stores/contextMenuStore'
 import { usePlayerStore } from '../stores/playerStore'
 
-const PAGE_SIZE = 30
 /** 本次会话记忆 Tab */
 const TAB_KEY = 'csplayer:searchTab'
 

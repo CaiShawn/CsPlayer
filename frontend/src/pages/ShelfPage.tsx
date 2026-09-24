@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { libraryApi } from '../api'
+import { libraryApi, PAGE_SIZE } from '../api'
 import type { AlbumBrief } from '../types'
 import { Cover } from '../components/common/Cover'
 import { Empty, Loading, LoadingMore } from '../components/common/Ui'
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll'
 import { useAuthStore } from '../stores/authStore'
 import { useContextMenuStore } from '../stores/contextMenuStore'
-
-/** 单批条数（与后端 PAGE 一致）：滚动到底自动续拉，不一次拉全量 */
-const PAGE_SIZE = 30
 
 export function ShelfPage() {
   const dataVersion = useAuthStore((s) => s.dataVersion)

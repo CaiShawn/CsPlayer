@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { searchApi } from '../api'
+import { PAGE_SIZE, searchApi } from '../api'
 import type { AlbumBrief, ArtistDetail, SongSummary } from '../types'
 import { Cover } from '../components/common/Cover'
 import { Empty, LoadError, Loading } from '../components/common/Ui'
@@ -9,9 +9,7 @@ import { useContextMenuStore } from '../stores/contextMenuStore'
 import { useLikesStore } from '../stores/likesStore'
 import { usePlayerStore } from '../stores/playerStore'
 
-const ALBUM_PAGE_SIZE = 30
-
-/** 歌手页（只读最小闭环）：热门歌曲 + 专辑列表（每页 30 张，可加载更多），不做关注 / 收藏 */
+/** 歌手页（只读最小闭环）：热门歌曲 + 专辑列表（每页 PAGE_SIZE 张，可加载更多），不做关注 / 收藏 */
 export function ArtistPage() {
   const { id } = useParams()
   const likedIds = useLikesStore((s) => s.ids)
@@ -55,7 +53,7 @@ export function ArtistPage() {
     }
   }, [id, reload])
 
-  // 专辑列表：分页拉取（每页 30 张）
+  // 专辑列表：分页拉取（每页 PAGE_SIZE 张）
   useEffect(() => {
     if (!id) return
     let cancelled = false
@@ -64,7 +62,7 @@ export function ArtistPage() {
       setAlbumsError('')
       setMoreError('')
       try {
-        const data = await searchApi.artistAlbums(Number(id), 0, ALBUM_PAGE_SIZE)
+        const data = await searchApi.artistAlbums(Number(id), 0, PAGE_SIZE)
         if (cancelled) return
         setAlbums(data.items)
         setAlbumTotal(data.total)
@@ -85,7 +83,7 @@ export function ArtistPage() {
     setLoadingMore(true)
     setMoreError('')
     try {
-      const data = await searchApi.artistAlbums(Number(id), albums.length, ALBUM_PAGE_SIZE)
+      const data = await searchApi.artistAlbums(Number(id), albums.length, PAGE_SIZE)
       setAlbums((prev) => {
         const seen = new Set(prev.map((a) => a.id))
         return [...prev, ...data.items.filter((a) => !seen.has(a.id))]
