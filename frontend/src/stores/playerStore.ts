@@ -37,6 +37,8 @@ export const QUALITY_LABEL: Record<QualityLevel, string> = {
 interface PlayerState {
   queue: SongSummary[]
   currentIndex: number
+  /** 队列来源标签（A2）：如「歌单《X》」，面板标题下展示；'' = 未知 */
+  queueSource: string
   playing: boolean
   playMode: PlayMode
   quality: QualityLevel
@@ -53,7 +55,7 @@ interface PlayerState {
   loadToken: number
 
   currentSong: () => SongSummary | null
-  playSongs: (list: SongSummary[], startIndex: number) => void
+  playSongs: (list: SongSummary[], startIndex: number, source?: string) => void
   enqueue: (list: SongSummary[]) => void
   /** 「下一首播放」：插入到当前曲之后（不带去重，可重复插入） */
   insertNext: (list: SongSummary[]) => void
@@ -71,6 +73,8 @@ interface PlayerState {
   setQuality: (q: QualityLevel) => void
   jumpTo: (index: number) => void
   removeFromQueue: (index: number) => void
+  /** 拖拽排序（B2）：把 from 行移到 to 位，当前曲索引跟随修正（不重载音频） */
+  moveInQueue: (from: number, to: number) => void
   clearQueue: () => void
   setLyric: (lyric: Lyric) => void
   syncLyricIndex: (timeSec: number) => void
@@ -166,6 +170,8 @@ interface QueueSession {
   quality: QualityLevel
   /** 刷新时刻的播放进度（秒），恢复后从该位置继续 */
   currentTime: number
+  /** 队列来源标签（A2），刷新恢复后仍显示 */
+  source: string
 }
 
 function readQueueSession(): QueueSession | null {
@@ -186,7 +192,13 @@ function readQueueSession(): QueueSession | null {
       typeof parsed.currentTime === 'number' && Number.isFinite(parsed.currentTime) && parsed.currentTime > 0
         ? parsed.currentTime
         : 0
-    return { queue: parsed.queue, currentIndex, quality, currentTime }
+    return {
+      queue: parsed.queue,
+      currentIndex,
+      quality,
+      currentTime,
+      source: typeof parsed.source === 'string' ? parsed.source : '',
+    }
   } catch {
     return null
   }
@@ -206,6 +218,7 @@ function writeQueueSession(): void {
         currentIndex: s.currentIndex,
         quality: s.quality,
         currentTime: s.currentTime,
+        source: s.queueSource,
       }),
     )
   } catch {
@@ -220,6 +233,7 @@ const queueSession = readQueueSession()
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
   queue: queueSession?.queue ?? [],
+  queueSource: queueSession?.source ?? '',
   currentIndex: queueSession?.currentIndex ?? -1,
   // 「刷新后自动播放」开启且有恢复队列时：刷新即自动继续播放（从原进度）
   playing: !!queueSession && useSettingsStore.getState().prefs.playback.autoPlayOnRestore,
@@ -241,12 +255,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     return s.queue[s.currentIndex]
   },
 
-  playSongs: (list, startIndex) => {
+  playSongs: (list, startIndex, source) => {
     unplayableStreak = 0
     const tracks = list.length ? list : []
     const idx = Math.max(0, Math.min(startIndex, tracks.length - 1))
     set({
       queue: tracks,
+      queueSource: source ?? '',
       currentIndex: tracks.length ? idx : -1,
       playing: tracks.length > 0,
       currentTime: 0,
@@ -307,7 +322,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   togglePlay: () => {
     const { currentIndex, queue, playing } = get()
     if (currentIndex < 0 && queue.length) {
-      get().playSongs(queue, 0)
+      get().playSongs(queue, 0, get().queueSource)
       return
     }
     set({ playing: !playing })
@@ -405,9 +420,30 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     set({ queue, currentIndex, loadToken })
   },
 
+  moveInQueue: (from, to) => {
+    const s = get()
+    const n = s.queue.length
+    if (from === to || from < 0 || from >= n || to < 0 || to >= n) return
+    const queue = [...s.queue]
+    const [item] = queue.splice(from, 1)
+    queue.splice(to, 0, item)
+    // 当前曲索引跟随修正：被移走的是当前曲 → 目标位；否则按「先删后插」映射
+    let currentIndex = s.currentIndex
+    if (currentIndex >= 0) {
+      if (from === currentIndex) currentIndex = to
+      else {
+        let i = currentIndex > from ? currentIndex - 1 : currentIndex
+        if (i >= to) i += 1
+        currentIndex = i
+      }
+    }
+    set({ queue, currentIndex })
+  },
+
   clearQueue: () =>
     set((s) => ({
       queue: [],
+      queueSource: '',
       currentIndex: -1,
       playing: false,
       currentTime: 0,

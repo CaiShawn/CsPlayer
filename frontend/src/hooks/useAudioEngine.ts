@@ -187,8 +187,12 @@ export function useAudioEngine() {
 }
 
 /** Trigger play of a track list. */
-export function playTracks(list: Parameters<ReturnType<typeof usePlayerStore.getState>['playSongs']>[0], startIndex = 0) {
-  usePlayerStore.getState().playSongs(list, startIndex)
+export function playTracks(
+  list: Parameters<ReturnType<typeof usePlayerStore.getState>['playSongs']>[0],
+  startIndex = 0,
+  source?: string,
+) {
+  usePlayerStore.getState().playSongs(list, startIndex, source)
 }
 
 export function useIsLoggedIn() {
