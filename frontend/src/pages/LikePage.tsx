@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import type { SongSummary } from '../types'
-import { Empty, LoadError, Loading } from '../components/common/Ui'
+import { Empty, ErrorBar, LoadError, SongSkeleton } from '../components/common/Ui'
 import { SongTable } from '../components/media/SongTable'
 import { useAuthStore } from '../stores/authStore'
 import { useLikesStore } from '../stores/likesStore'
@@ -21,7 +21,7 @@ export function LikePage() {
   const playing = usePlayerStore((s) => s.playing)
 
   useEffect(() => {
-    void fetchTracks()
+    void fetchTracks(dataVersion)
   }, [dataVersion, fetchTracks])
 
   const playAll = () => {
@@ -62,10 +62,17 @@ export function LikePage() {
       </div>
 
       <div className="mt-6">
-        {!tracksLoaded ? (
-          <Loading />
-        ) : tracksError ? (
-          <LoadError message={tracksError} onRetry={() => void fetchTracks()} />
+        {/* SWR（§4.3 a）：有缓存直接渲染 + 顶部错误条提示刷新失败；无缓存才出骨架 */}
+        {tracksError && tracksLoaded && (
+          <ErrorBar
+            message={`${tracksError}（当前显示的是上次缓存内容）`}
+            onRetry={() => void fetchTracks(dataVersion)}
+          />
+        )}
+        {!tracksLoaded && !tracksError ? (
+          <SongSkeleton />
+        ) : !tracksLoaded ? (
+          <LoadError message={tracksError} onRetry={() => void fetchTracks(dataVersion)} />
         ) : tracks.length === 0 ? (
           <Empty text="暂无喜欢的歌曲" />
         ) : (

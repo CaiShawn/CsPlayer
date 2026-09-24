@@ -75,7 +75,9 @@ async def song_detail(song_id: int, session: dict = Depends(get_session)) -> Api
 @router.get("/user/likes")
 async def user_likes(session: dict = Depends(get_session)) -> ApiResponse:
     data = await library_service.user_likes(session["cookie"], session["user_id"])
-    return ok(data.model_dump())
+    # 字段裁剪（S2-1）：ids 与 tracks[].id 全量冗余（千级曲目 ≈ 8KB），
+    # 前端自 tracks 派生，不再下发
+    return ok(data.model_dump(exclude={"ids"}))
 
 
 @router.get("/user/liked-ids")

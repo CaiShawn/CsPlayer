@@ -113,8 +113,6 @@ def map_album_brief(raw: dict) -> AlbumBrief:
         coverUrl=str(raw.get("picUrl") or raw.get("blurPicUrl") or ""),
         artistId=int(artist_id or 0),
         artistName=str(artist_name or ""),
-        publishTime=raw.get("publishTime"),
-        size=int(raw.get("size") or 0),
     )
 
 
@@ -129,6 +127,6 @@ def map_album_detail(meta: dict, songs: list[dict]) -> AlbumDetail:
         artistId=int(artist.get("id") or 0),
         artistName=brief.artistName,
         description=str(meta.get("description") or ""),
-        publishTime=brief.publishTime,
+        publishTime=meta.get("publishTime"),
         tracks=tracks,
     )

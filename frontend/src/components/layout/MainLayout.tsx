@@ -24,7 +24,7 @@ export function MainLayout() {
   const showLyric = currentId != null && !lyricCollapsed
 
   useEffect(() => {
-    void fetchIds()
+    void fetchIds(dataVersion)
   }, [dataVersion, fetchIds])
 
   return (

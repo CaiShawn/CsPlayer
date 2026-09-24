@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any
 
@@ -57,18 +58,9 @@ async def user_playlists(cookie: dict, user_id: int) -> dict:
     if cached:
         return cached
 
-    resp = await _ncm_get(
-        "user_playlist", cookie=cookie, uid=user_id, limit=100, offset=0
-    )
-    body = resp.body or {}
-    if resp.status != 200:
-        raise _upstream_error(resp, f"获取用户歌单失败 uid={user_id}")
-    playlist = body.get("playlist") or []
     created: list[PlaylistBrief] = []
     subscribed: list[PlaylistBrief] = []
-    for raw in playlist:
-        if not isinstance(raw, dict):
-            continue
+    for raw in await _user_playlists_raw(cookie, user_id):
         brief = map_playlist_brief(raw, user_id)
         if brief.subscribed:
             subscribed.append(brief)
@@ -82,6 +74,28 @@ async def user_playlists(cookie: dict, user_id: int) -> dict:
     }
     cache.set(key, result, settings.cache_ttl["user_playlists"])
     return result
+
+
+async def _user_playlists_raw(cookie: dict, user_id: int) -> list[dict]:
+    """用户歌单原始列表（含 trackCount 等原始字段）。
+
+    `user_playlists` 与 `_liked_playlist`（我喜欢）共用同一份上游缓存（S2-1 减往返）：
+    两个入口都只打一次 user_playlist，另一方直接命中内存。
+    """
+    key = f"user:{user_id}:playlists:raw"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+
+    resp = await _ncm_get(
+        "user_playlist", cookie=cookie, uid=user_id, limit=100, offset=0
+    )
+    body = resp.body or {}
+    if resp.status != 200:
+        raise _upstream_error(resp, f"获取用户歌单失败 uid={user_id}")
+    items = [p for p in (body.get("playlist") or []) if isinstance(p, dict)]
+    cache.set(key, items, settings.cache_ttl["user_playlists"])
+    return items
 
 
 async def user_albums(
@@ -146,41 +160,81 @@ async def playlist_detail(cookie: dict, playlist_id: int, user_id: int | None) -
     if not meta or not meta.get("id"):
         raise not_found("歌单不存在或无权访问")
 
-    tracks_raw = await _playlist_tracks(cookie, playlist_id)
+    # meta 自带 trackCount → 分页可一次编排（S2-1）
+    tracks_raw = await _playlist_tracks(
+        cookie, playlist_id, hint_total=int(meta.get("trackCount") or 0)
+    )
     detail = map_playlist_detail(meta, tracks_raw, user_id)
     cache.set(key, detail.model_dump(), settings.cache_ttl["playlist_detail"])
     return detail
 
 
-async def _playlist_tracks(cookie: dict, playlist_id: int) -> list[dict]:
+async def _fetch_track_page(
+    cookie: dict, playlist_id: int, offset: int, limit: int
+) -> list[dict]:
+    resp = await _ncm_get(
+        "playlist_track_all",
+        cookie=cookie,
+        id=playlist_id,
+        limit=limit,
+        offset=offset,
+    )
+    body = resp.body or {}
+    if resp.status != 200:
+        raise _upstream_error(
+            resp, f"获取歌单歌曲失败 id={playlist_id} offset={offset}"
+        )
+    songs = body.get("songs") or []
+    return [s for s in songs if isinstance(s, dict)]
+
+
+async def _playlist_tracks(
+    cookie: dict, playlist_id: int, hint_total: int | None = None
+) -> list[dict]:
+    """歌单全部曲目（分页拉取，带内存缓存）。
+
+    S2-1：调用方可传 hint_total（来自歌单 meta / trackCount），则全部分页
+    用 asyncio.gather 一次编排（后续 SDK 并发化后可直接受益），不再逐页串行
+    等待；trackCount 滞后时靠「末页满页续拉」兜底。缺 hint 时退化为原串行循环。
+    单页 50 条不变：单页响应越小，SDK/QuickJS 大响应崩溃概率越低。
+    """
     key = f"playlist:{playlist_id}:tracks"
     cached = cache.get(key)
     if cached:
         return cached
 
+    limit = 50
+    max_offset = 2000
     all_tracks: list[dict] = []
-    offset = 0
-    limit = 50  # 单页响应越小，SDK/QuickJS 大响应崩溃概率越低
-    while True:
-        resp = await _ncm_get(
-            "playlist_track_all",
-            cookie=cookie,
-            id=playlist_id,
-            limit=limit,
-            offset=offset,
+
+    if hint_total and hint_total > 0:
+        pages = min(-(-int(hint_total) // limit), max_offset // limit)
+        page_lists = await asyncio.gather(
+            *[
+                _fetch_track_page(cookie, playlist_id, i * limit, limit)
+                for i in range(pages)
+            ]
         )
-        body = resp.body or {}
-        if resp.status != 200:
-            raise _upstream_error(
-                resp, f"获取歌单歌曲失败 id={playlist_id} offset={offset}"
-            )
-        songs = body.get("songs") or []
-        all_tracks.extend(s for s in songs if isinstance(s, dict))
-        if len(songs) < limit:
-            break
-        offset += limit
-        if offset > 2000:
-            break
+        for page in page_lists:
+            all_tracks.extend(page)
+        # trackCount 可能滞后（刚红心/取消）：末页满页则继续顺序补页
+        last_len = len(page_lists[-1]) if page_lists else 0
+        offset = pages * limit
+        while last_len >= limit and offset <= max_offset:
+            page = await _fetch_track_page(cookie, playlist_id, offset, limit)
+            all_tracks.extend(page)
+            last_len = len(page)
+            offset += limit
+    else:
+        offset = 0
+        while True:
+            page = await _fetch_track_page(cookie, playlist_id, offset, limit)
+            all_tracks.extend(page)
+            if len(page) < limit:
+                break
+            offset += limit
+            if offset > max_offset:
+                break
 
     cache.set(key, all_tracks, settings.cache_ttl["playlist_detail"])
     return all_tracks
@@ -213,23 +267,31 @@ def _is_liked_playlist(raw: dict) -> bool:
     return name == "我喜欢的音乐" or name.endswith("喜欢的音乐")
 
 
-async def liked_playlist_id(cookie: dict, user_id: int) -> int:
-    key = f"user:{user_id}:liked_playlist_id"
-    cached = cache.get(key)
-    if cached:
-        return int(cached)
+async def _liked_playlist(cookie: dict, user_id: int) -> dict:
+    """「我喜欢的音乐」歌单项（id + trackCount）。
 
-    resp = await _ncm_get("user_playlist", cookie=cookie, uid=user_id, limit=20, offset=0)
-    body = resp.body or {}
-    if resp.status != 200:
-        raise _upstream_error(resp, f"获取用户歌单失败(liked_playlist_id) uid={user_id}")
-    for raw in body.get("playlist") or []:
+    直接复用 `_user_playlists_raw` 的同一份上游缓存（S2-1 减往返）；
+    trackCount 仅作分页编排 hint（_playlist_tracks 有兜底），故 like 变更后
+    不失效本缓存，避免每次红心后多打一次 user_playlist。pid 对账号不可变，
+    用长 TTL（liked_playlist）消除 /like 重复冷路径上的 user_playlist 往返。
+    """
+    key = f"user:{user_id}:liked_playlist"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+
+    for raw in await _user_playlists_raw(cookie, user_id):
         if isinstance(raw, dict) and _is_liked_playlist(raw):
             pid = int(raw.get("id") or 0)
             if pid:
-                cache.set(key, pid, settings.cache_ttl["user_playlists"])
-                return pid
+                info = {"id": pid, "trackCount": int(raw.get("trackCount") or 0)}
+                cache.set(key, info, settings.cache_ttl["liked_playlist"])
+                return info
     raise not_found("未找到「我喜欢的音乐」歌单")
+
+
+async def liked_playlist_id(cookie: dict, user_id: int) -> int:
+    return int((await _liked_playlist(cookie, user_id))["id"])
 
 
 async def user_liked_ids(cookie: dict, user_id: int) -> list[int]:
@@ -237,6 +299,14 @@ async def user_liked_ids(cookie: dict, user_id: int) -> list[int]:
     cached = cache.get(key)
     if cached is not None:
         return cached
+
+    # 单一数据源（S2-1）：likes 缓存命中时直接派生 ids（前端也从 tracks 派生），
+    # 省一次上游 likelist 往返；likes 未缓存时才回 likelist
+    likes_cached = cache.get(f"user:{user_id}:likes")
+    if likes_cached:
+        derived = [int(i) for i in likes_cached.get("ids") or []]
+        cache.set(key, derived, settings.cache_ttl["user_liked_ids"])
+        return derived
 
     resp = await _ncm_get("likelist", cookie=cookie, uid=user_id)
     body = resp.body or {}
@@ -254,8 +324,11 @@ async def user_likes(cookie: dict, user_id: int) -> LikedSongs:
     if cached:
         return LikedSongs(**cached)
 
-    pid = await liked_playlist_id(cookie, user_id)
-    tracks_raw = await _playlist_tracks(cookie, pid)
+    info = await _liked_playlist(cookie, user_id)
+    pid = int(info["id"])
+    tracks_raw = await _playlist_tracks(
+        cookie, pid, hint_total=int(info.get("trackCount") or 0)
+    )
     tracks: list[SongSummary] = [
         map_song(t) for t in tracks_raw if isinstance(t, dict) and t.get("id")
     ]
@@ -322,6 +395,7 @@ async def _invalidate_like_cache(
     cache.invalidate(f"user:{user_id}:likes")
     cache.invalidate(f"user:{user_id}:liked_ids")
     cache.invalidate(f"user:{user_id}:playlists")
+    cache.invalidate(f"user:{user_id}:playlists:raw")
     if song_id is not None:
         cache.invalidate(f"song:{song_id}:detail")
     try:

@@ -82,13 +82,12 @@ export interface PlaylistDetail {
 }
 
 export interface AlbumBrief {
+  // 字段集 = 前端实际使用集（v0.1.6 裁剪 publishTime / size）
   id: number
   name: string
   coverUrl: string
   artistId: number
   artistName: string
-  publishTime: number | null
-  size: number
 }
 
 export interface AlbumDetail {
@@ -109,7 +108,8 @@ export type QrStatus = 'waiting' | 'scanned' | 'success' | 'expired' | 'rate_lim
 export interface LikedSongs {
   playlistId: number
   tracks: SongSummary[]
-  ids: number[]
+  /** v0.1.6 起后端不再下发（与 tracks[].id 全量冗余，前端自 tracks 派生） */
+  ids?: number[]
 }
 
 export interface LikeResult {

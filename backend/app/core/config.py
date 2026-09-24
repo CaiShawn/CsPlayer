@@ -22,6 +22,9 @@ class Settings:
             "song_detail": 300,
             "user_likes": 60,
             "user_liked_ids": 60,
+            # 「我喜欢」歌单 id / trackCount：pid 对账号不可变，长缓存消除
+            # /like 冷路径上的 user_playlist 往返（trackCount 仅作分页 hint，自校正）
+            "liked_playlist": 24 * 3600,
             "user_recent": 60,
             "search": 60,
             "artist_detail": 300,

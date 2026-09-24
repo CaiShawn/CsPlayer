@@ -3,82 +3,122 @@ import { Link } from 'react-router-dom'
 import { libraryApi } from '../api'
 import type { AlbumBrief, PlaylistBrief } from '../types'
 import { Cover } from '../components/common/Cover'
-import { Empty, Loading } from '../components/common/Ui'
+import { CardGridSkeleton, Empty, ErrorBar } from '../components/common/Ui'
 import { useAuthStore } from '../stores/authStore'
 import { useContextMenuStore } from '../stores/contextMenuStore'
 
 const PAGE_SIZE = 50
 
+interface LibraryData {
+  created: PlaylistBrief[]
+  subscribed: PlaylistBrief[]
+  albums: AlbumBrief[]
+  hasMore: boolean
+}
+
+/** SWR 内存快照（§4.3 a）：二次进入立即渲染缓存内容（<100ms），后台静默刷新；
+ *  按 authStore.dataVersion 归属，切账号不串数据。 */
+let snapshot: { version: number; data: LibraryData } | null = null
+
 export function LibraryPage() {
   const dataVersion = useAuthStore((s) => s.dataVersion)
-  const [created, setCreated] = useState<PlaylistBrief[]>([])
-  const [subscribed, setSubscribed] = useState<PlaylistBrief[]>([])
-  const [albums, setAlbums] = useState<AlbumBrief[]>([])
-  const [hasMore, setHasMore] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
+  const cached = snapshot?.version === dataVersion ? snapshot.data : null
+  const [data, setData] = useState<LibraryData | null>(cached)
+  const [loading, setLoading] = useState(!cached)
   const [error, setError] = useState('')
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [reloadTick, setReloadTick] = useState(0)
 
-  const loadAlbums = useCallback(async (offset: number, replace: boolean) => {
-    if (replace) setError('')
-    else setLoadingMore(true)
+  const load = useCallback(async () => {
+    const warm = snapshot?.version === dataVersion ? snapshot.data : null
+    // SWR：有缓存先显缓存（静默刷新）；无缓存/切账号 → 骨架屏
+    if (warm) setData(warm)
+    else {
+      setData(null)
+      setLoading(true)
+    }
+    setError('')
     try {
-      const data = await libraryApi.albums(offset, PAGE_SIZE)
-      const items = data.items || []
-      setAlbums((prev) => (replace ? items : [...prev, ...items]))
-      setHasMore(!!data.hasMore)
+      const [pl, al] = await Promise.all([
+        libraryApi.playlists(),
+        libraryApi.albums(0, PAGE_SIZE),
+      ])
+      const first = al.items || []
+      // 静默刷新保留用户已「加载更多」的尾部专辑（分页由用户驱动，避免闪烁/丢滚动位置）
+      const tail =
+        warm && warm.albums.length > first.length
+          ? warm.albums.slice(first.length)
+          : []
+      const headIds = new Set(first.map((a) => a.id))
+      const next: LibraryData = {
+        created: pl.created || [],
+        subscribed: pl.subscribed || [],
+        albums: [...first, ...tail.filter((a) => !headIds.has(a.id))],
+        hasMore: !!al.hasMore,
+      }
+      snapshot = { version: dataVersion, data: next }
+      setData(next)
+      setError('')
     } catch (e) {
-      if (replace) setError(e instanceof Error ? e.message : '加载失败')
+      // SWR：失败保留上次缓存（若有），由顶部错误条提示 + 重试
+      setError(e instanceof Error ? e.message : '加载失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [dataVersion])
+
+  useEffect(() => {
+    void load()
+  }, [load, reloadTick])
+
+  const onLoadMoreAlbums = async () => {
+    if (!data || loadingMore || !data.hasMore) return
+    setLoadingMore(true)
+    try {
+      const al = await libraryApi.albums(data.albums.length, PAGE_SIZE)
+      setData((prev) => {
+        if (!prev) return prev
+        const next: LibraryData = {
+          ...prev,
+          albums: [...prev.albums, ...(al.items || [])],
+          hasMore: !!al.hasMore,
+        }
+        if (snapshot?.version === dataVersion) snapshot = { version: dataVersion, data: next }
+        return next
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '加载失败')
     } finally {
       setLoadingMore(false)
     }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const [pl, al] = await Promise.all([
-          libraryApi.playlists(),
-          libraryApi.albums(0, PAGE_SIZE),
-        ])
-        if (cancelled) return
-        setCreated(pl.created || [])
-        setSubscribed(pl.subscribed || [])
-        setAlbums(al.items || [])
-        setHasMore(!!al.hasMore)
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : '加载失败')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [dataVersion, loadAlbums])
-
-  const onLoadMoreAlbums = () => {
-    if (loadingMore || !hasMore) return
-    void loadAlbums(albums.length, false)
   }
 
-  if (loading) return <Loading />
-  if (error)
+  if (loading) return <LibrarySkeleton />
+  if (!data) {
     return (
-      <div className="p-8 text-center text-sm text-red-400">{error}</div>
+      <div className="p-8">
+        <ErrorBar
+          message={error || '加载失败'}
+          onRetry={() => setReloadTick((t) => t + 1)}
+        />
+      </div>
     )
+  }
 
   return (
     <div className="space-y-10 p-8 pb-28">
+      {error && (
+        <ErrorBar
+          message={`${error}（当前显示的是上次缓存内容）`}
+          onRetry={() => setReloadTick((t) => t + 1)}
+        />
+      )}
       <Section title="我创建的歌单">
-        {created.length === 0 ? (
+        {data.created.length === 0 ? (
           <Empty text="暂无创建的歌单" />
         ) : (
           <CardGrid>
-            {created.map((p) => (
+            {data.created.map((p) => (
               <PlaylistCard key={p.id} playlist={p} />
             ))}
           </CardGrid>
@@ -86,11 +126,11 @@ export function LibraryPage() {
       </Section>
 
       <Section title="我收藏的歌单">
-        {subscribed.length === 0 ? (
+        {data.subscribed.length === 0 ? (
           <Empty text="暂无收藏的歌单" />
         ) : (
           <CardGrid>
-            {subscribed.map((p) => (
+            {data.subscribed.map((p) => (
               <PlaylistCard key={p.id} playlist={p} />
             ))}
           </CardGrid>
@@ -98,20 +138,20 @@ export function LibraryPage() {
       </Section>
 
       <Section title="收藏的专辑">
-        {albums.length === 0 ? (
+        {data.albums.length === 0 ? (
           <Empty text="暂无收藏的专辑" />
         ) : (
           <>
             <CardGrid>
-              {albums.map((a) => (
+              {data.albums.map((a) => (
                 <AlbumCard key={a.id} album={a} />
               ))}
             </CardGrid>
-            {hasMore && (
+            {data.hasMore && (
               <div className="mt-6 flex justify-center">
                 <button
                   type="button"
-                  onClick={onLoadMoreAlbums}
+                  onClick={() => void onLoadMoreAlbums()}
                   disabled={loadingMore}
                   className="rounded-full border border-neutral-700 bg-neutral-900 px-6 py-2 text-sm text-neutral-200 hover:border-accent/50 hover:text-accent-soft disabled:opacity-50"
                 >
@@ -122,6 +162,20 @@ export function LibraryPage() {
           </>
         )}
       </Section>
+    </div>
+  )
+}
+
+/** 冷加载骨架屏：三节布局与真实内容一致，首屏即刻可交互（§4.3 a） */
+function LibrarySkeleton() {
+  return (
+    <div className="space-y-10 p-8 pb-28">
+      {[0, 1, 2].map((i) => (
+        <section key={i}>
+          <div className="mb-4 h-5 w-28 animate-pulse rounded bg-neutral-800" />
+          <CardGridSkeleton count={5} />
+        </section>
+      ))}
     </div>
   )
 }

@@ -12,6 +12,7 @@ ncm_init 必崩），本模块是唯一的重试边界——重试永远发生�
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import json
 import logging
 import multiprocessing
@@ -153,8 +154,39 @@ def _call_serial(fn_name: str, cookie: dict, kwargs: dict) -> Response:
         raise bad_gateway("音乐服务内部错误，请重试") from last_exc
 
 
+# ---------------------------------------------------------------------------
+# 上游调用计时（S0-1 性能度量）：按请求（contextvar）累计上游 SDK 调用
+# 次数与耗时，供 PerfLogMiddleware 归因「上游 / 串行 / 体积」瓶颈。
+# ------------------------------------------------------------------------
+
+_perf_ms: contextvars.ContextVar[float] = contextvars.ContextVar(
+    "csplayer_ncm_perf_ms", default=0.0
+)
+_perf_calls: contextvars.ContextVar[int] = contextvars.ContextVar(
+    "csplayer_ncm_perf_calls", default=0
+)
+
+
+def reset_perf() -> None:
+    """请求开始时清零（在请求 task 上下文内调用）。"""
+    _perf_ms.set(0.0)
+    _perf_calls.set(0)
+
+
+def perf_stats() -> tuple[int, float]:
+    """返回（上游调用次数, 上游累计耗时 ms）。"""
+    return _perf_calls.get(), _perf_ms.get()
+
+
 async def ncm_call(fn_name: str, cookie: dict | None = None, **kwargs: Any) -> Response:
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(
-        _executor, lambda: _call_serial(fn_name, cookie or {}, kwargs)
-    )
+    start = time.perf_counter()
+    try:
+        return await loop.run_in_executor(
+            _executor, lambda: _call_serial(fn_name, cookie or {}, kwargs)
+        )
+    finally:
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        _perf_calls.set(_perf_calls.get() + 1)
+        _perf_ms.set(_perf_ms.get() + elapsed_ms)
+        logger.debug("上游 SDK %s 耗时 %.1fms", fn_name, elapsed_ms)
