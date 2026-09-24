@@ -82,7 +82,8 @@ export function VolumeControl() {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    // gap-3：静音图标 ↔ 音量滑条 12px（与滑条右侧到「词」的间距对齐）
+    <div className="flex items-center gap-3">
       <button
         type="button"
         onClick={handleMute}
@@ -93,7 +94,8 @@ export function VolumeControl() {
         <VolumeIcon state={iconState} />
       </button>
       <Slider
-        className="w-20"
+        // -mr-2：吃掉「词」按钮 px-2 的左内边距，滑轨 → 「词」字形同样 12px
+        className="w-20 -mr-2"
         value={muted ? 0 : volume}
         onChange={setVolume}
         label="音量"
