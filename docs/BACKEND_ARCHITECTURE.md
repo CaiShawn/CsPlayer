@@ -202,11 +202,11 @@ song:{id}:detail / :lyric / :url:{quality}
 
 同样是内存实现：`sid (secrets.token_urlsafe(24)) → {cookie, user_id, created_at}`，TTL 7 天。
 
-关键点：**服务端保存的是网易云的 Cookie 字符串解析成的 dict**（`{"MUSIC_U": "..."}`），请求上游时把它带给 SDK。也就是说 `wyy_session` 这个 httpOnly Cookie 只是**本地会话 id**，真正的网易云凭据只存在服务器内存里，不会下发到浏览器（前端也因此拿不到、泄漏面小）。
+关键点：**服务端保存的是网易云的 Cookie 字符串解析成的 dict**（`{"MUSIC_U": "..."}`），请求上游时把它带给 SDK。也就是说 `wyy_session` 这个 httpOnly Cookie 只是**本地会话 id**。v0.1.4 起，`qr/check` 成功与 `restore` 会把网易云凭据（`cred`）一并下发给浏览器保管（localStorage，v0.1.5 为多账号凭证库），用于后端重启后免扫码重建会话——服务端仍**零落盘**，内存会话里的凭据随进程生命周期消失；信任域权衡见 `docs/V0.1.5_DESIGN.md` §3.1/§6。
 
 另外两个工具函数：`parse_cookie_str`（`"a=1; b=2"` → dict）和 `merge_set_cookie`（把上游 `Set-Cookie` 合并进现有 cookie，处理刷新登录态）。**注意**：解析时会按 `COOKIE_ATTRS` 过滤 `Max-Age/Expires/Path` 等 Set-Cookie 属性——上游 cookie 字符串里混着它们，不能当成 cookie 收进来（历史上曾把 `Path=/wapi/feedback` 之类存进会话污染凭据）。
 
-规划中：`docs/V0.1.4_DESIGN.md` 计划把凭据改存浏览器 localStorage + `/api/auth/restore` 恢复会话（解决后端重启需重新扫码的问题；**尚未实现**）。
+已实现（v0.1.4）：凭据改存浏览器 localStorage + `/api/auth/restore` 用凭据重建会话（解决后端重启需重新扫码的问题，后端零落盘）；v0.1.5 升级为前端多账号凭证库（切换账号免扫码），后端契约不变。
 
 #### `ncm_client.py` + `ncm_worker.py` — 网易云 SDK 子进程隔离（全项目最硬核的部分）
 
@@ -242,9 +242,13 @@ POST /api/auth/qr/create → 上游 login_qr_create 拿 qrurl，本地 qrcode �
 POST /api/auth/qr/check  → 前端每 ~2s 轮询一次，上游返回码：
                             800 过期 / 801 待扫描 / 802 已扫待确认 / 803 成功
                             成功 → 提取 Cookie → 拉 user_account 建会话 → 种下
-                                   httpOnly Cookie(wyy_session)
+                                   httpOnly Cookie(wyy_session)，并把 {user, cred}
+                                   下发给浏览器（凭证入库，v0.1.4+）
 GET  /api/auth/me        → 用户资料（带 5 分钟缓存）
-POST /api/auth/logout    → 上游登出 + 本地删会话 + 清缓存 + 清 Cookie
+POST /api/auth/restore   → 用浏览器保存的凭证重建会话（v0.1.4；免扫码，登录成功
+                            后切换/冷启动自动恢复共用同一入口，返回 {user}）
+POST /api/auth/logout    → 上游登出（吊销凭证）+ 本地删会话 + 清缓存 + 清 Cookie
+                            （v0.1.5 语义：彻底退出当前账号，其余已保存账号不动）
 ```
 
 两个值得学习的工程细节：
@@ -354,9 +358,9 @@ clear_session_cookie # 登出清 Cookie
 
 ### 鉴权
 
-- 无 `Depends(get_session)` 的接口只有 `/api/auth/qr/*` 和 `/api/health`。
-- 会话是纯内存的：**后端重启 = 全员掉线**（本地单机工具可接受；要持久化就换 SQLite/Redis 改 `session.py` 一个文件）。
-- 上游凭据（网易云 Cookie）只存服务端，浏览器只持有本地 sid。
+- 无 `Depends(get_session)` 的接口只有 `/api/auth/qr/*`、`/api/auth/restore` 和 `/api/health`。
+- 会话是纯内存的：**后端重启 = 全员掉线**（本地单机工具可接受；要持久化就换 SQLite/Redis 改 `session.py` 一个文件）。掉线后前端用浏览器保存的凭证调 `restore` 静默重建会话（v0.1.4+），用户无感。
+- 上游凭据（网易云 Cookie）服务端只存内存、**零落盘**；同时自 v0.1.4 起也由浏览器 localStorage 保管（多账号凭证库，可查看/移除/清空），凭据不出 localhost 信任域。
 
 ### 并发模型
 
@@ -390,6 +394,7 @@ main.py @app.exception_handler(Exception)   ← 兜底
 | POST | `/api/auth/qr/key` | ✗ | routers/auth.py |
 | POST | `/api/auth/qr/create` | ✗ | routers/auth.py |
 | POST | `/api/auth/qr/check` | ✗ | routers/auth.py |
+| POST | `/api/auth/restore` | ✗ | routers/auth.py |
 | GET | `/api/auth/me` | ✓ | routers/auth.py |
 | POST | `/api/auth/logout` | ✓ | routers/auth.py |
 | GET | `/api/user/playlists` | ✓ | routers/song.py |
@@ -429,7 +434,7 @@ main.py @app.exception_handler(Exception)   ← 兜底
 
 ## 7. 已知局限（设计取舍，不是遗漏）
 
-1. **全内存状态**（会话、缓存）：重启掉线、缓存清空；多进程部署会话不共享（也因此 uvicorn 只跑单进程）。
+1. **全内存状态**（会话、缓存）：重启掉线（前端用浏览器凭证自动恢复，v0.1.4+）、缓存清空；多进程部署会话不共享（也因此 uvicorn 只跑单进程）。
 2. **SDK 串行调用 + worker 单点**：所有网易云请求排队进单个 worker，一个慢请求会拖慢后面的（用缓存缓解）；worker 崩溃后重建有 1~2s 冷启动，反复崩会触发 30s 熔断退避（期间返回可读 502，但服务不崩）。
 3. **"最近播放"缺失**：`user_record` 实为听歌排行；真正的最近播放接口带登录态触发 SDK 原生崩溃，已搁置（`docs/archived/DEBUG.md` 有完整排查记录）。
 4. **无请求日志/指标**、无 CSRF token（靠 SameSite=Lax 缓解）、CORS 白名单写死在配置里。
