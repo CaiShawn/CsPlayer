@@ -111,21 +111,8 @@ export function PlayerBar() {
         {/* 音量区：滑轨居中于「歌曲时长 ↔ 词」的正中（组件自带 w-56 占位） */}
         <VolumeControl />
 
-        {/* right tools：「列」「词」（v0.1.7 起对调；两按钮等宽，音量滑条位置不变） */}
+        {/* right tools：「词」「列」 */}
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            data-cs-queue-toggle
-            onClick={toggleQueue}
-            title={queueVisible ? '收起队列' : '展开播放队列'}
-            className={`rounded px-2 py-1 text-sm hover:bg-neutral-800 ${
-              queueVisible
-                ? 'text-accent-text hover:text-accent-soft'
-                : 'text-neutral-500 hover:text-neutral-100'
-            }`}
-          >
-            列
-          </button>
           <button
             type="button"
             onClick={toggleLyric}
@@ -140,6 +127,19 @@ export function PlayerBar() {
             }`}
           >
             词
+          </button>
+          <button
+            type="button"
+            data-cs-queue-toggle
+            onClick={toggleQueue}
+            title={queueVisible ? '收起队列' : '展开播放队列'}
+            className={`rounded px-2 py-1 text-sm hover:bg-neutral-800 ${
+              queueVisible
+                ? 'text-accent-text hover:text-accent-soft'
+                : 'text-neutral-500 hover:text-neutral-100'
+            }`}
+          >
+            列
           </button>
         </div>
       </div>
