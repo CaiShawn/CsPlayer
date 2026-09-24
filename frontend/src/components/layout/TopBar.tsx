@@ -16,6 +16,11 @@ export function TopBar() {
   const navigate = useNavigate()
   const location = useLocation()
   const onSettings = location.pathname === '/settings'
+  // 记录进入设置前的页面（含查询串），齿轮再点一下即返回
+  const prevPathRef = useRef('/home')
+  useEffect(() => {
+    if (!onSettings) prevPathRef.current = location.pathname + location.search
+  }, [location.pathname, location.search, onSettings])
   const [menuOpen, setMenuOpen] = useState(false)
   const [switchOpen, setSwitchOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -107,7 +112,6 @@ export function TopBar() {
       <button
         type="button"
         aria-label="回到首页"
-        title="回到首页"
         onClick={() => {
           if (location.pathname === '/home') {
             document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
@@ -115,7 +119,7 @@ export function TopBar() {
             navigate('/home')
           }
         }}
-        className="min-w-0 select-none rounded-md px-1 py-0.5 text-left transition-colors hover:bg-neutral-900"
+        className="min-w-0 select-none rounded-md px-1 py-0.5 text-left"
       >
         <div className="text-base font-semibold tracking-wide text-accent-text">CsPlayer</div>
         <div className="truncate text-[10px] leading-3 text-neutral-500">
@@ -256,7 +260,7 @@ export function TopBar() {
         type="button"
         title="设置"
         aria-label="设置"
-        onClick={() => navigate('/settings')}
+        onClick={() => navigate(onSettings ? prevPathRef.current : '/settings')}
         className={`flex h-8 w-8 items-center justify-center rounded-full text-base leading-none transition-colors hover:bg-neutral-900 ${
           onSettings ? 'text-accent-text' : 'text-neutral-400 hover:text-neutral-100'
         }`}
