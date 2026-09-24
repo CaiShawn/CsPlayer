@@ -102,9 +102,13 @@ export function LikePage() {
             onToggleLike={onToggleLike}
           />
         )}
-        {/* 分批加载哨兵：紧凑空挡（h-8），滚动到底自动续拉并在空挡内高亮提示加载中 */}
+        {/* 分批加载哨兵：整块底部空白（列表底 → 播放条上沿）即本元素 h-36=144px，
+            「加载中」在空白正中垂直居中；-mb-28 抵消 pb-24×2 超出播放条的 112px，
+            整体留白不变（哨兵上沿仍在列表底部，滚动触发时机不受影响） */}
         {tracksLoaded && hasMore && (
-          <div ref={sentinelRef}>{loadingMore && <LoadingMore />}</div>
+          <div ref={sentinelRef} className="-mb-28 flex h-36 items-center justify-center">
+            {loadingMore && <LoadingMore />}
+          </div>
         )}
       </div>
     </div>

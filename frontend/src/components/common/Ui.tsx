@@ -6,12 +6,12 @@ export function Loading({ text = '加载中…' }: { text?: string }) {
   )
 }
 
-/** 分批续拉指示（我喜欢 / 唱片架）：列表与底部的紧凑空挡（h-8）内高亮提示，
- *  spinner + 主题色，比正文更醒目 */
+/** 分批续拉指示（我喜欢 / 唱片架）：底部整块空白中央的紧凑小条，
+ *  spinner + 主题色高亮；宽度收紧（小 spinner + 小字号） */
 export function LoadingMore({ text = '加载中…' }: { text?: string }) {
   return (
-    <div className="flex h-8 items-center justify-center gap-2 text-sm font-medium text-accent-soft">
-      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-accent/25 border-t-accent" />
+    <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-accent-soft">
+      <span className="h-3 w-3 animate-spin rounded-full border-2 border-accent/25 border-t-accent" />
       {text}
     </div>
   )
