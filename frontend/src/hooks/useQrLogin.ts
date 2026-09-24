@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { authApi } from '../api'
-import { saveCred } from '../utils/cred'
+import { touchAccount, upsertAccount } from '../utils/cred'
 import type { QrStatus, UserProfile } from '../types'
 
 const POLL_MS = 3000
@@ -67,8 +67,9 @@ export function useQrLogin(
 
           if (res.status === 'success' && res.user) {
             stopPoll()
-            // 凭证交浏览器保管（v0.1.4），切换账号时覆盖旧凭证（单凭证模型）
-            saveCred(res.cred)
+            // 凭证入库（v0.1.5 多账号凭证库）：同号覆盖刷新、新号插入并置为 active
+            if (res.cred) upsertAccount(res.user, res.cred)
+            else touchAccount(res.user.userId)
             onSuccessRef.current(res.user)
             return
           }

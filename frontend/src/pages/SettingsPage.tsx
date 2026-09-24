@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { usePlayerStore } from '../stores/playerStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { ColorPicker } from '../components/settings/ColorPicker'
+import { AccountsSettings } from '../components/settings/AccountsSettings'
 import { ContextMenuSettings } from '../components/settings/ContextMenuSettings'
 import { Segmented, SettingRow, SettingSection, Switch } from '../components/settings/controls'
 import { APP_VERSION } from '../version'
@@ -12,6 +13,7 @@ const GROUPS = [
   { id: 'playback', label: '播放' },
   { id: 'lyric', label: '歌词' },
   { id: 'contextMenu', label: '右键菜单' },
+  { id: 'accounts', label: '账号凭证' },
   { id: 'cache', label: '缓存' },
   { id: 'about', label: '关于' },
 ]
@@ -218,6 +220,9 @@ export function SettingsPage() {
         {/* 右键菜单 */}
         <ContextMenuSettings />
 
+        {/* 账号凭证（v0.1.5） */}
+        <AccountsSettings />
+
         {/* 缓存 */}
         <SettingSection id="cache" title="缓存" desc="本地数据占用与重置">
           <SettingRow
@@ -246,7 +251,10 @@ export function SettingsPage() {
               恢复默认
             </button>
           </SettingRow>
-          <SettingRow label="清除本地数据" hint="偏好、队列快照等一次清空（不可恢复）；播放队列同时清空">
+          <SettingRow
+            label="清除本地数据"
+            hint="偏好、队列快照等一次清空（不可恢复）；播放队列同时清空，不影响「账号凭证」中的登录凭证"
+          >
             <button
               type="button"
               onClick={onClearLocalData}

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { setUnauthorizedHandler } from './api'
 import { useAuthStore } from './stores/authStore'
@@ -40,11 +40,14 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 export default function App() {
   const clear = useAuthStore((s) => s.clear)
   const navigate = useNavigate()
+  /** 切换期间被挂起的 401（§3.6.1），切换结束后统一自愈 */
+  const suspendedRef = useRef(false)
+  const healRef = useRef<() => void>(() => {})
 
   useEffect(() => {
-    setUnauthorizedHandler(() => {
-      // 先用浏览器保存的凭证静默恢复（v0.1.4）；成功留在当前页（dataVersion 自愈），
-      // 失败才清空状态并回登录页扫码
+    // 自愈：先用浏览器凭证库静默恢复 active 账号（v0.1.4 → v0.1.5 多账号库）；
+    // 成功留在当前页（dataVersion 自愈），失败才清空状态并回登录页扫码
+    healRef.current = () => {
       void useAuthStore
         .getState()
         .restoreSession()
@@ -54,7 +57,26 @@ export default function App() {
           usePlayerStore.getState().clearQueue()
           navigate('/login', { replace: true })
         })
+    }
+
+    setUnauthorizedHandler(() => {
+      const auth = useAuthStore.getState()
+      if (auth.switching) {
+        // 切换进行中：挂起（不自动恢复、不跳登录页），避免旧账号在途 401 把 active 抢回
+        suspendedRef.current = true
+        return
+      }
+      healRef.current()
     })
+
+    // 切换结束：成功时 dataVersion 已 bump（页面按新会话重拉）；
+    // 失败时旧会话可能已死，对挂起的 401 统一按新 active 自愈一次
+    const unsub = useAuthStore.subscribe((s, prev) => {
+      if (!prev.switching || s.switching || !suspendedRef.current) return
+      suspendedRef.current = false
+      if (s.dataVersion === prev.dataVersion) healRef.current()
+    })
+    return unsub
   }, [clear, navigate])
 
   return (

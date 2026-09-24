@@ -12,7 +12,7 @@ from .routers import stream as stream_router
 
 logger = logging.getLogger("csplayer.http")
 
-app = FastAPI(title="CsPlayer", version="0.1.4")
+app = FastAPI(title="CsPlayer", version="0.1.5")
 
 app.add_middleware(
     CORSMiddleware,
