@@ -92,14 +92,14 @@ npm run dev
 - 播放过程中的临时故障会被自动处理，不影响后续播放
 - 刷新后没有自动播放？多为浏览器自动播放策略拦截（页面会提示「浏览器阻止了自动播放」）：在站点设置里**允许自动播放**即可，详见下文
 
-> ### 自动播放设置（浏览器侧）
->
-> 开启「刷新后自动播放」仍被拦时，在浏览器里为本站放行即可（应用内入口：设置 → 播放 → 「刷新后自动播放」 ⓘ）：
->
-> - **Chrome**：桌面版已移除「自动播放」站点设置，推荐用**媒体参与度**自动放行——在本站正常听歌一段时间后 Chrome 自动放行（`chrome://media-engagement` 可查本站分数）；开发机可 `chrome://flags/#autoplay-policy` →「No user gesture is required」，或启动参数 `--autoplay-policy=no-user-gesture-required`；另确认 `chrome://settings/content/sound` 中本站未被静音
-> - **Edge**：地址栏 🔒 图标 → 「网站设置」→「媒体自动播放」→ 允许；或 `edge://settings/content/mediaAutoplay` 加入允许名单
-> - **Firefox**：地址栏 🔒 图标 → 关闭「阻止音频自动播放」；或 `about:preferences#privacy` → 权限 → 自动播放 → 音频「允许」
-> - **Safari**：设置 → 网站 → 自动播放 → 对本站选「允许所有自动播放」
+#### 自动播放设置（浏览器侧）
+
+开启「刷新后自动播放」仍被拦时，在浏览器里为本站放行即可（应用内入口：设置 → 播放 → 「刷新后自动播放」 ⓘ）：
+
+- **Chrome**：桌面版已移除「自动播放」站点设置，推荐用**媒体参与度**自动放行——在本站正常听歌一段时间后 Chrome 自动放行（`chrome://media-engagement` 可查本站分数）；开发机可 `chrome://flags/#autoplay-policy` →「No user gesture is required」，或启动参数 `--autoplay-policy=no-user-gesture-required`；另确认 `chrome://settings/content/sound` 中本站未被静音
+- **Edge**：地址栏 🔒 图标 → 「网站设置」→「媒体自动播放」→ 允许；或 `edge://settings/content/mediaAutoplay` 加入允许名单
+- **Firefox**：地址栏 🔒 图标 → 关闭「阻止音频自动播放」；或 `about:preferences#privacy` → 权限 → 自动播放 → 音频「允许」
+- **Safari**：设置 → 网站 → 自动播放 → 对本站选「允许所有自动播放」
 
 ## Updates
 
@@ -118,4 +118,8 @@ npm run dev
 
 > 音乐接口基于 [NeteaseCloudMusic_PythonSDK](https://github.com/2061360308/NeteaseCloudMusic_PythonSDK)（底层为 [MusicLibrary](https://github.com/2061360308/MusicLibrary)）。
 
-> 开发者文档（架构设计、SDK 参考、版本规划）见 `docs/` 目录；版本路线见 `docs/ROADMAP.md`（v0.1.8 样式与展示 → v0.1.9 下载与格式转换）；历史版本设计与进展（v0.1.0–v0.1.6）及 v0.1.5 体验反馈已封存在 `docs/archived/`。
+> 开发者文档（架构设计、SDK 参考、版本规划）见 `docs/` 目录；
+>
+> 版本路线见 `docs/ROADMAP.md`；
+>
+> 历史版本设计与进展见 `docs/archived/`。
