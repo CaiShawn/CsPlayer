@@ -49,18 +49,28 @@ export function ShareCardModal() {
   const [ratio, setRatio] = useState<ShareCardRatio>('3:4')
   const [spec, setSpec] = useState<ShareCardSpec | null>(null)
   const [comment, setComment] = useState('') // 个人评论（可选，实时预览）
+  const [accent, setAccent] = useState('#10b981') // 主题色（弹窗内可切换，切换对象时重置回主题）
+  const [bgMode, setBgMode] = useState<'gradient' | 'solid'>('gradient') // 背景样式
   const [cover, setCover] = useState<HTMLImageElement | null>(null)
   const [coverDone, setCoverDone] = useState(false) // 封面加载已完结（成功或失败）
   const [failed, setFailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  const accentHex = useMemo(currentAccentHex, [source]) // 打开瞬间取色；弹窗内主题不会变
+  // 可选色板：当前主题色（含自定义）+ 7 预设，去重
+  const swatches = useMemo(() => {
+    const theme = currentAccentHex()
+    const list = ACCENT_PRESETS.map((p) => p.hex)
+    return list.includes(theme) ? list : [theme, ...list]
+  }, [])
 
-  // 最终 spec：叠加个人评论（空 = undefined，不占位）；评论输入不触发封面重载
+  // 最终 spec：叠加评论 / 弹窗内选的主题色 / 背景样式
   const finalSpec = useMemo(
-    () => (spec ? { ...spec, comment: comment.trim() || undefined } : null),
-    [spec, comment],
+    () =>
+      spec
+        ? { ...spec, comment: comment.trim() || undefined, accentHex: accent, bgStyle: bgMode }
+        : null,
+    [spec, comment, accent, bgMode],
   )
 
   // 入参 → spec（专辑 Brief 缺曲目数时补拉一次详情，服务端缓存 300s）
@@ -68,16 +78,18 @@ export function ShareCardModal() {
     if (!source) return
     setSpec(null)
     setComment('')
+    setAccent(currentAccentHex()) // 重置回当前主题色
     setCover(null)
     setCoverDone(false)
     setFailed(false)
     let cancelled = false
     ;(async () => {
       try {
-        let s = buildShareCardSpec(source, accentHex)
+        // 基础 accent 用当前主题色即可，弹窗内选色由 finalSpec 覆盖（避免换色触发重拉）
+        let s = buildShareCardSpec(source, currentAccentHex())
         if (!s && source.kind === 'album') {
           const detail = await libraryApi.albumDetail(source.album.id)
-          s = albumSpecFromDetail(detail, accentHex)
+          s = albumSpecFromDetail(detail, currentAccentHex())
         }
         if (!cancelled) setSpec(s)
       } catch {
@@ -87,7 +99,7 @@ export function ShareCardModal() {
     return () => {
       cancelled = true
     }
-  }, [source, accentHex])
+  }, [source])
 
   // 封面像素（失败 → null，渲染层出占位）
   useEffect(() => {
@@ -199,6 +211,43 @@ export function ShareCardModal() {
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-neutral-600">
             {comment.length}/{COMMENT_MAX}
           </span>
+        </div>
+
+        {/* 背景样式 + 主题色（弹窗内临时切换，不影响应用设置） */}
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <div className="flex gap-1 rounded-full border border-neutral-800 bg-neutral-950/60 p-1">
+            {(['gradient', 'solid'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setBgMode(m)}
+                className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                  bgMode === m
+                    ? 'bg-accent font-medium text-neutral-950'
+                    : 'text-neutral-400 hover:text-neutral-100'
+                }`}
+              >
+                {m === 'gradient' ? '渐变' : '纯色'}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            {swatches.map((hex) => (
+              <button
+                key={hex}
+                type="button"
+                onClick={() => setAccent(hex)}
+                className={`h-[18px] w-[18px] rounded-full border transition-transform ${
+                  accent === hex
+                    ? 'scale-110 border-white/70'
+                    : 'border-white/10 hover:scale-105'
+                }`}
+                style={{ backgroundColor: hex }}
+                aria-label={`主题色 ${hex}`}
+                title={hex}
+              />
+            ))}
+          </div>
         </div>
 
         <div className="mt-3 flex items-center justify-between gap-3">

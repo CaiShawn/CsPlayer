@@ -39,10 +39,12 @@ export interface ShareCardSpec {
   subtitle: string
   meta: string
   coverUrl: string
-  /** 主题 accent（#rrggbb），由调用方派生 */
+  /** 主题 accent（#rrggbb），由调用方派生（弹窗内可临时切换） */
   accentHex: string
-  /** 个人评论（可选，弹窗输入，置底渲染；空 = 不占位） */
+  /** 个人评论（可选，弹窗输入，固定渲染在卡片底部原落款行位置；空 = 不占位） */
   comment?: string
+  /** 背景样式：渐变海报底（默认）/ 纯色 */
+  bgStyle?: 'gradient' | 'solid'
 }
 
 /** 导出基准像素（竖版 1080 宽、横版 1080 高） */
@@ -345,7 +347,7 @@ function drawCommentBottom(
 }
 
 /**
- * 海报底：对角线性渐变 + accent 光晕三层。
+ * 海报底：渐变 = 对角线性渐变 + accent 光晕三层；纯色 = 近黑实底。
  * 注意：封面径向的中心会被大封面遮挡，可见性靠「底部上升」与「外围衰减」两层保证。
  */
 function drawBackground(
@@ -355,7 +357,13 @@ function drawBackground(
   cx: number,
   cy: number,
   rgb: [number, number, number],
+  bgStyle: 'gradient' | 'solid' = 'gradient',
 ) {
+  if (bgStyle === 'solid') {
+    ctx.fillStyle = '#101010'
+    ctx.fillRect(0, 0, W, H)
+    return
+  }
   const lin = ctx.createLinearGradient(0, 0, W, H)
   lin.addColorStop(0, '#181818')
   lin.addColorStop(1, '#0a0a0a')
@@ -466,7 +474,7 @@ export function renderShareCard(
     textX = H_PAGE_PAD + coverSize + H_TEXT_GAP
     const sh = stackHeight(f, m.titleLines.length)
     textTop = coverY + Math.max(0, Math.round((coverSize - sh) / 2))
-    drawBackground(ctx, W, H, coverX + coverSize / 2, coverY + coverSize / 2, rgb)
+    drawBackground(ctx, W, H, coverX + coverSize / 2, coverY + coverSize / 2, rgb, spec.bgStyle)
     drawCover(ctx, coverX, coverY, coverSize, cover, rgb)
     drawStack(ctx, spec, textX, textTop, maxTextW, f, m)
     drawCommentBottom(ctx, spec, m, f, pad, H)
@@ -488,7 +496,7 @@ export function renderShareCard(
     coverY = PAGE_PAD + Math.max(0, Math.round((maxContentH - blockH) / 2))
     textX = PAGE_PAD
     textTop = coverY + coverSize + COVER_GAP
-    drawBackground(ctx, W, H, W / 2, coverY + coverSize * 0.35, rgb)
+    drawBackground(ctx, W, H, W / 2, coverY + coverSize * 0.35, rgb, spec.bgStyle)
     drawCover(ctx, coverX, coverY, coverSize, cover, rgb)
     drawStack(ctx, spec, textX, textTop, maxTextW, f, m)
     drawCommentBottom(ctx, spec, m, f, pad, H)
