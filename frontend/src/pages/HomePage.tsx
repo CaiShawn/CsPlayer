@@ -6,9 +6,9 @@ import { useLikesStore } from '../stores/likesStore'
 
 /* 模块入口：文案与侧栏统一（S3-1，设计 §4.4）；近来听为本地记录入口（S4） */
 const ENTRIES = [
-  { to: '/like', title: '我喜欢', desc: '云端红心歌曲，设备同步', icon: '♥' },
-  { to: '/recent', title: '近来听', desc: '最近播放，本地记录（暂）', icon: '↺' },
-  { to: '/library', title: '音乐库', desc: '我的歌单：创建与收藏的歌单', icon: '☰' },
+  { to: '/like', title: '我喜欢', desc: '云端红心歌曲', icon: '♥' },
+  { to: '/recent', title: '近来听', desc: '最近播放', icon: '↺' },
+  { to: '/library', title: '音乐库', desc: '我的歌单', icon: '☰' },
   { to: '/record', title: '自听榜', desc: '云端听歌排行', icon: '⏱' },
   { to: '/shelf', title: '唱片架', desc: '收藏的专辑', icon: '♫' },
 ]
@@ -107,17 +107,17 @@ export function HomePage() {
           <Link
             key={c.to}
             to={c.to}
-            className="group rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6 transition hover:border-accent/40 hover:bg-neutral-900"
+            className="group flex aspect-square flex-col justify-between rounded-2xl border border-neutral-800 bg-neutral-900/40 p-6 transition hover:border-accent/40 hover:bg-neutral-900"
           >
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/15 text-xl text-accent-soft">
-                {c.icon}
-              </div>
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/15 text-3xl text-accent-soft">
+              {c.icon}
+            </div>
+            <div>
               <div className="text-lg font-semibold text-neutral-100 group-hover:text-accent-soft">
                 {c.title}
               </div>
+              <div className="mt-1 text-sm text-neutral-500">{c.desc}</div>
             </div>
-            <div className="mt-3 text-sm text-neutral-500">{c.desc}</div>
           </Link>
         ))}
       </div>
