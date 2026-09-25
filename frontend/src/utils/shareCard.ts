@@ -137,7 +137,6 @@ const H_PAGE_PAD = 88 // 横版页边
 const COVER_GAP = 56 // 竖版封面-文字间距
 const H_TEXT_GAP = 72 // 横版封面-文案列间距
 const BOTTOM_PAD = 44 // 底部评论块距底边（原落款行位置）
-const MAX_EXPORT_BYTES = 2000 * 1024 // 导出体积红线（需求方定：≤ 2MB）
 
 /** 字号体系：竖 / 横两套（font 字符串不含字体栈） */
 interface Fonts {
@@ -495,23 +494,15 @@ export function renderShareCard(
  * --------------------------------------------------------------------- */
 
 /**
- * 离屏渲染 → JPEG Blob（scale=1 基准尺寸）。
- * 统一导出 JPG（需求方定）；体积红线 2000KB，超限画质逐档下调（卡片为不透明底）。
+ * 离屏渲染 → JPEG Blob（scale=1 基准尺寸，画质 0.92）。
+ * 统一导出 JPG（需求方定）。
  */
 export async function exportShareCardBlob(
   spec: ShareCardSpec,
   ratio: ShareCardRatio,
   cover: HTMLImageElement | null,
-): Promise<{ blob: Blob; ext: 'jpg' }> {
+): Promise<Blob | null> {
   const canvas = document.createElement('canvas')
   renderShareCard(canvas, spec, ratio, cover, 1)
-  const toBlob = (quality?: number) =>
-    new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
-
-  for (const q of [0.92, 0.86, 0.8, 0.72]) {
-    const blob = await toBlob(q)
-    if (blob && blob.size <= MAX_EXPORT_BYTES) return { blob, ext: 'jpg' }
-  }
-  const last = await toBlob(0.72)
-  return { blob: last!, ext: 'jpg' }
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92))
 }
