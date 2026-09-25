@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { libraryApi, PAGE_SIZE } from '../api'
 import type { AlbumBrief } from '../types'
@@ -20,8 +20,15 @@ export function ShelfPage() {
   const [loadMoreError, setLoadMoreError] = useState('')
   const [error, setError] = useState('')
 
-  // S2-2 搜索：前端过滤已加载（名称/歌手包含，不区分大小写）
+  // S2-2 搜索：前端过滤；首搜自动补齐全量（limit=200 分批，后端上限），边拉边显、拉完内存缓存
+  // （仅搜已加载会漏掉未滚动到的收藏，结果不可信；后端加参数也得拉全量，成本同源）
   const [query, setQuery] = useState('')
+  const [loadingAll, setLoadingAll] = useState(false)
+  const albumsCountRef = useRef(0) // 已加载张数（补齐循环内同步推进）
+  const hasMoreRef = useRef(false) // 补齐循环读 ref，避免 state 变更反复取消重启
+  const totalRef = useRef(0)
+  const fetchingAllRef = useRef(false)
+  const kwRef = useRef('') // 循环内读最新搜索词（清空即停拉）
   const kw = query.trim().toLowerCase()
   const visible = useMemo(
     () =>
@@ -61,9 +68,12 @@ export function ShelfPage() {
       const data = await libraryApi.albums(offset, PAGE_SIZE)
       const items = data.items || []
       setAlbums((prev) => (replace ? items : [...prev, ...items]))
+      albumsCountRef.current = replace ? items.length : albumsCountRef.current + items.length
+      totalRef.current = data.total || 0
+      hasMoreRef.current = items.length > 0 && !!data.hasMore
       setTotal(data.total || 0)
       // 零进展防护：无新条目时 offset 不会推进，按到尾处理（防连续加载链死循环）
-      setHasMore(items.length > 0 && !!data.hasMore)
+      setHasMore(hasMoreRef.current)
     } catch (e) {
       if (replace) setError(e instanceof Error ? e.message : '加载失败')
       // 断链：续拉失败不自动重试（观察器停发），哨兵位展示错误 + 重试
@@ -74,10 +84,56 @@ export function ShelfPage() {
     }
   }, [])
 
+  // 搜索补齐全量：输入非空且还有未加载部分时，分批（limit=200）拉到尾；
+  // 条件全部走 ref（state 变更不重启循环）；kwRef 清空即停拉；换账号（dataVersion）时由重载流程中止
+  kwRef.current = kw
+  useEffect(() => {
+    if (!kw || fetchingAllRef.current) return
+    if (!hasMoreRef.current || albumsCountRef.current >= totalRef.current) return
+    fetchingAllRef.current = true
+    setLoadingAll(true)
+    ;(async () => {
+      try {
+        while (fetchingAllRef.current && kwRef.current) {
+          const data = await libraryApi.albums(albumsCountRef.current, 200)
+          const items = data.items || []
+          if (!fetchingAllRef.current || !kwRef.current) return
+          if (items.length === 0) {
+            hasMoreRef.current = false
+            setHasMore(false)
+            return
+          }
+          setAlbums((prev) => {
+            const seen = new Set(prev.map((p) => p.id))
+            const fresh = items.filter((i) => !seen.has(i.id))
+            albumsCountRef.current += fresh.length
+            return [...prev, ...fresh]
+          })
+          totalRef.current = data.total || 0
+          setTotal(totalRef.current)
+          if (!data.hasMore || items.length < 200) {
+            hasMoreRef.current = false
+            setHasMore(false)
+            return
+          }
+        }
+      } catch (e) {
+        if (kwRef.current)
+          useUiStore
+            .getState()
+            .setToast(e instanceof Error ? e.message : '加载全部收藏失败，可重试搜索')
+      } finally {
+        fetchingAllRef.current = false
+        setLoadingAll(false)
+      }
+    })()
+  }, [kw])
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       if (cancelled) return
+      fetchingAllRef.current = false // 数据版本变更：中止补齐循环，避免旧账号数据混入
       await load(0, true)
     })()
     return () => {
@@ -105,9 +161,11 @@ export function ShelfPage() {
       <h1 className="text-2xl font-bold text-neutral-50">唱片墙</h1>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-neutral-500">
-          {kw
-            ? `匹配 ${visible.length} 张 · 已加载 ${albums.length}${total > albums.length ? ` / ${total}` : ''} 张`
-            : `收藏的专辑${total > 0 ? ` · 共 ${total} 张` : ''}`}
+          {loadingAll
+            ? `正在加载全部收藏（${albums.length} / ${total}）…`
+            : kw
+              ? `匹配 ${visible.length} 张 · 共 ${albums.length} 张`
+              : `收藏的专辑${total > 0 ? ` · 共 ${total} 张` : ''}`}
           {hasSelection ? ` · 已选 ${picked.length} 张` : ''}
         </p>
         <input
@@ -127,7 +185,11 @@ export function ShelfPage() {
         ) : albums.length === 0 ? (
           <Empty text="暂无收藏的专辑" />
         ) : visible.length === 0 ? (
-          <Empty text={`没有匹配的专辑（仅搜索已加载的 ${albums.length} 张）`} />
+          loadingAll ? (
+            <Loading text="正在加载全部收藏…" />
+          ) : (
+            <Empty text={`没有匹配的专辑（已搜索全部 ${albums.length} 张）`} />
+          )
         ) : (
           <>
             <div className="grid grid-cols-2 gap-[var(--space-card-gap)] sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
