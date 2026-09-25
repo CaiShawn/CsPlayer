@@ -70,9 +70,10 @@ async def user_playlists(cookie: dict, user_id: int) -> dict:
         brief = map_playlist_brief(raw, user_id)
         if brief.subscribed:
             subscribed.append(brief)
-        else:
+        elif not _is_liked_playlist(raw):
+            # 「我喜欢的音乐」不进「我创建的歌单」（验收反馈）：已有独立的「我喜欢」入口
             created.append(brief)
-    # 我喜欢的音乐置顶：名称约定 + creator 是自己且通常为第一项
+    # 首位优先（名称含“喜欢”的自建歌单置顶，保留原排序语义）
     created.sort(key=lambda p: (0 if "喜欢" in p.name else 1, p.id))
     result = {
         "created": [p.model_dump() for p in created],
