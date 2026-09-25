@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { libraryApi } from '../../api'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useUiStore } from '../../stores/uiStore'
 import { ACCENT_PRESETS, normalizeHex } from '../../utils/color'
 import { loadCoverImage } from '../../utils/coverImage'
 import {
+  albumSpecFromDetail,
   buildShareCardSpec,
   exportShareCardPng,
   renderShareCard,
@@ -17,7 +19,7 @@ import { Loading } from '../common/Ui'
 
 /* ---------------------------------------------------------------------------
  * 分享卡片弹窗（v0.1.8 S1，设计 §1.5）：
- *   预览（与导出同一渲染函数）+ 比例切换 + 下载 PNG。
+ *   预览（与导出同一渲染函数）+ 比例切换 + 下载到本地。
  *   挂载于 MainLayout，自取 uiStore.shareSource，null 时不出现在 DOM。
  * ------------------------------------------------------------------------ */
 
@@ -45,28 +47,51 @@ export function ShareCardModal() {
   const close = useUiStore((s) => s.closeShareCard)
 
   const [ratio, setRatio] = useState<ShareCardRatio>('3:4')
+  const [spec, setSpec] = useState<ShareCardSpec | null>(null)
   const [comment, setComment] = useState('') // 个人评论（可选，实时预览）
   const [cover, setCover] = useState<HTMLImageElement | null>(null)
   const [coverDone, setCoverDone] = useState(false) // 封面加载已完结（成功或失败）
+  const [failed, setFailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const accentHex = useMemo(currentAccentHex, [source]) // 打开瞬间取色；弹窗内主题不会变
 
-  // spec：三类型全部来自 target 自身字段，同步构建；叠加评论（空 = undefined，不占位）
-  const finalSpec = useMemo<ShareCardSpec | null>(() => {
-    if (!source) return null
-    return { ...buildShareCardSpec(source, accentHex), comment: comment.trim() || undefined }
-  }, [source, accentHex, comment])
+  // 最终 spec：叠加个人评论（空 = undefined，不占位）；评论输入不触发封面重载
+  const finalSpec = useMemo(
+    () => (spec ? { ...spec, comment: comment.trim() || undefined } : null),
+    [spec, comment],
+  )
 
-  // 切换对象时重置评论输入
+  // 入参 → spec（专辑 Brief 缺曲目数时补拉一次详情，服务端缓存 300s）
   useEffect(() => {
+    if (!source) return
+    setSpec(null)
     setComment('')
-  }, [source])
+    setCover(null)
+    setCoverDone(false)
+    setFailed(false)
+    let cancelled = false
+    ;(async () => {
+      try {
+        let s = buildShareCardSpec(source, accentHex)
+        if (!s && source.kind === 'album') {
+          const detail = await libraryApi.albumDetail(source.album.id)
+          s = albumSpecFromDetail(detail, accentHex)
+        }
+        if (!cancelled) setSpec(s)
+      } catch {
+        if (!cancelled) setFailed(true)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [source, accentHex])
 
   // 封面像素（失败 → null，渲染层出占位）
   useEffect(() => {
-    const url = finalSpec?.coverUrl
+    const url = spec?.coverUrl
     if (!url) {
       setCover(null)
       setCoverDone(true)
@@ -82,7 +107,7 @@ export function ShareCardModal() {
     return () => {
       cancelled = true
     }
-  }, [finalSpec?.coverUrl])
+  }, [spec?.coverUrl])
 
   // 预览绘制（dpr 适配防锯齿，缩放基准为版式宽；spec/封面/比例任一变化即重绘）
   useEffect(() => {
@@ -151,7 +176,9 @@ export function ShareCardModal() {
         <p className="mt-1 text-xs text-neutral-500">生成图片卡片（不含链接与二维码），保存后自行分享</p>
 
         <div className="mt-4 flex min-h-0 flex-1 items-center justify-center overflow-y-auto rounded-xl bg-neutral-950/60 py-4">
-          {!finalSpec || !coverDone ? (
+          {failed ? (
+            <div className="px-6 text-center text-sm text-neutral-400">卡片数据准备失败，请关闭后重试</div>
+          ) : !finalSpec || !coverDone ? (
             <Loading text="" />
           ) : (
             <canvas ref={canvasRef} className="rounded-lg shadow-lg" aria-label="分享卡片预览" />

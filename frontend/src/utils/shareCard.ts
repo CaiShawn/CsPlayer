@@ -3,7 +3,7 @@
  *
  * 手绘 canvas 2D（零依赖），五档比例（1:1 / 3:4 / 9:16 / 4:3 / 16:9）：
  * 竖版单栏（封面在上）、横版双栏（封面左 + 文案右），同一文本栈绘制器；
- * 主题 accent 用在三处结构点（徽标 / 评论竖线 / 落款圆点）+ 背景渐变，
+ * 主题 accent 用在三处结构点（徽标 / 评论竖线 / 元信息分隔点）+ 背景渐变，
  * 其余中性色。细节精修：封面投影 + 微描边、标题字距、元信息前置分隔点。
  *
  * 本模块纯渲染，不 import 任何 store——accent hex 由调用方从 settingsStore 派生；
@@ -16,7 +16,7 @@ import type {
   PlaylistDetail,
   SongSummary,
 } from '../types'
-import { artistNames } from './format'
+import { artistNames, formatDuration } from './format'
 
 /* ------------------------------------------------------------------------
  * 类型与常量
@@ -37,6 +37,7 @@ export interface ShareCardSpec {
   kind: ShareCardKind
   title: string
   subtitle: string
+  meta: string
   coverUrl: string
   /** 主题 accent（#rrggbb），由调用方派生 */
   accentHex: string
@@ -70,13 +71,15 @@ const FONT_STACK = 'system-ui, "PingFang SC", "Microsoft YaHei", sans-serif'
  * Spec 构建（数据全部来自现有 target 字段；仅专辑 Brief 缺曲目数时需先拉详情）
  * --------------------------------------------------------------------- */
 
-export function buildShareCardSpec(source: ShareCardSource, accentHex: string): ShareCardSpec {
+export function buildShareCardSpec(source: ShareCardSource, accentHex: string): ShareCardSpec | null {
   if (source.kind === 'song') {
     const { song } = source
+    const meta = [song.albumName, formatDuration(song.durationMs)].filter(Boolean).join(' · ')
     return {
       kind: 'song',
       title: song.name,
       subtitle: artistNames(song.artists),
+      meta,
       coverUrl: song.coverUrl,
       accentHex,
     }
@@ -87,18 +90,37 @@ export function buildShareCardSpec(source: ShareCardSource, accentHex: string): 
       kind: 'playlist',
       title: p.name,
       subtitle: p.creatorName || '歌单',
+      meta: `${p.trackCount} 首`,
       coverUrl: p.coverUrl,
       accentHex,
     }
   }
-  const a = source.album
+  // 专辑：Brief 无曲目数据 → 返回 null，调用方补拉详情后走 albumSpecFromDetail
+  if ('tracks' in source.album) return albumSpecFromDetail(source.album, accentHex)
+  return null
+}
+
+export function albumSpecFromDetail(detail: AlbumCardData, accentHex: string): ShareCardSpec {
+  const totalMs = detail.tracks.reduce((sum, t) => sum + (t.durationMs || 0), 0)
   return {
     kind: 'album',
-    title: a.name,
-    subtitle: a.artistName,
-    coverUrl: a.coverUrl,
+    title: detail.name,
+    subtitle: detail.artistName,
+    meta: `${detail.tracks.length} 首 · ${formatTotalDuration(totalMs)}`,
+    coverUrl: detail.coverUrl,
     accentHex,
   }
+}
+
+/** 超过 1h 用 h:mm:ss，否则 m:ss（formatDuration 的 m:ss 封顶不够用） */
+function formatTotalDuration(ms: number): string {
+  if (!ms || ms < 0) return '0:00'
+  const total = Math.round(ms / 1000)
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  const ss = s.toString().padStart(2, '0')
+  return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${ss}` : `${m}:${ss}`
 }
 
 /** Windows 非法文件名字符清洗（设计 §1.3 导出流程） */
@@ -112,7 +134,6 @@ export function sanitizeFilename(name: string): string {
 
 const PAGE_PAD = 72 // 竖版页边
 const H_PAGE_PAD = 88 // 横版页边
-const FOOTER_ZONE = 64
 const COVER_GAP = 56 // 竖版封面-文字间距
 const H_TEXT_GAP = 72 // 横版封面-文案列间距
 
@@ -127,6 +148,7 @@ interface Fonts {
   comment: string
   commentLh: number
   commentMax: number
+  meta: string
 }
 
 const V_FONTS: Fonts = {
@@ -139,6 +161,7 @@ const V_FONTS: Fonts = {
   comment: '400 28px',
   commentLh: 42,
   commentMax: 2,
+  meta: '400 27px',
 }
 
 const H_FONTS: Fonts = {
@@ -151,6 +174,7 @@ const H_FONTS: Fonts = {
   comment: '400 28px',
   commentLh: 42,
   commentMax: 2,
+  meta: '400 28px',
 }
 
 function pxOf(font: string): number {
@@ -238,16 +262,16 @@ function measureStack(ctx: CanvasRenderingContext2D, spec: ShareCardSpec, maxW: 
   return { titleLines, commentLines }
 }
 
-/** 文本栈总高（徽标 + 标题 + 副题 + 评论置底?） */
+/** 文本栈总高（徽标 + 标题 + 副题 + 元信息 + 评论置底?） */
 function stackHeight(f: Fonts, titleLines: number, commentLines: number): number {
-  let h = 44 + 36 + titleLines * f.titleLh + 22 + f.subtitleLh
+  let h = 44 + 36 + titleLines * f.titleLh + 22 + f.subtitleLh + 18 + 36
   if (commentLines > 0) h += 20 + commentLines * f.commentLh
   return h
 }
 
 /**
- * 文本栈绘制（徽标 → 标题 → 副题 → 评论置底?），返回实际占用高度。
- * 评论为引用体：accent 竖线 + 浅色文字，位于文本栈最后一位。
+ * 文本栈绘制（徽标 → 标题 → 副题 → 元信息 → 评论置底?），返回实际占用高度。
+ * 元信息前置 accent 分隔点；评论为引用体：accent 竖线 + 浅色文字，位于文本栈最后一位。
  */
 function drawStack(
   ctx: CanvasRenderingContext2D,
@@ -285,7 +309,17 @@ function drawStack(
   ctx.font = `${f.subtitle} ${FONT_STACK}`
   ctx.fillStyle = '#d4d4d4'
   ctx.fillText(ellipsize(ctx, spec.subtitle, maxW), x, y + pxOf(f.subtitle))
-  y += f.subtitleLh
+  y += f.subtitleLh + 18
+
+  // 元信息（前置 accent 分隔点）
+  ctx.fillStyle = spec.accentHex
+  ctx.beginPath()
+  ctx.arc(x + 4, y + 22, 4, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.font = `${f.meta} ${FONT_STACK}`
+  ctx.fillStyle = '#a3a3a3'
+  ctx.fillText(ellipsize(ctx, spec.meta, maxW - 18), x + 18, y + 26)
+  y += 36
 
   // 个人评论（引用体：accent 竖线 + 浅色文字，置底）
   if (m.commentLines.length) {
@@ -371,18 +405,6 @@ function drawCover(ctx: CanvasRenderingContext2D, x: number, y: number, size: nu
   ctx.stroke()
 }
 
-/** 底部落款（固定贴底）：accent 圆点 + 品牌行 */
-function drawFooter(ctx: CanvasRenderingContext2D, H: number, pad: number, accentHex: string) {
-  const baseline = H - FOOTER_ZONE + (FOOTER_ZONE - 34) / 2 + 17
-  ctx.fillStyle = accentHex
-  ctx.beginPath()
-  ctx.arc(pad + 7, baseline - 9, 7, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.font = `400 26px ${FONT_STACK}`
-  ctx.fillStyle = '#737373'
-  ctx.fillText('CsPlayer · 你的网易云，本该这么安静', pad + 30, baseline)
-}
-
 /**
  * 把卡片渲染到 canvas。
  * scale：1 = 导出原始尺寸；预览传（显示宽 × dpr）/ 版式宽。
@@ -414,10 +436,10 @@ export function renderShareCard(
   let maxTextW: number
 
   if (horizontal) {
-    // 双栏：封面占高（扣除页边与落款区）且不超过版面宽 40%，文案列垂直居中
-    coverSize = Math.min(H - 2 * H_PAGE_PAD - FOOTER_ZONE, Math.round(W * 0.4))
+    // 双栏：封面占高（扣除页边）且不超过版面宽 40%，文案列垂直居中
+    coverSize = Math.min(H - 2 * H_PAGE_PAD, Math.round(W * 0.4))
     coverX = H_PAGE_PAD
-    coverY = Math.round((H - FOOTER_ZONE - coverSize) / 2)
+    coverY = Math.round((H - coverSize) / 2)
     textX = H_PAGE_PAD + coverSize + H_TEXT_GAP
     maxTextW = W - textX - H_PAGE_PAD
     const m = measureStack(ctx, spec, maxTextW, f)
@@ -427,10 +449,10 @@ export function renderShareCard(
     drawCover(ctx, coverX, coverY, coverSize, cover, rgb)
     drawStack(ctx, spec, textX, textTop, maxTextW, f, m)
   } else {
-    // 单栏：封面先按上限，再按「最坏 2 行标题 + 评论 + 页边 + 落款」逐档收缩
+    // 单栏：封面先按上限，再按「最坏 2 行标题 + 评论 + 页边」逐档收缩
     maxTextW = W - 2 * PAGE_PAD
     const m = measureStack(ctx, spec, maxTextW, f)
-    const maxContentH = H - 2 * PAGE_PAD - FOOTER_ZONE
+    const maxContentH = H - 2 * PAGE_PAD
     coverSize = Math.min(W - 2 * PAGE_PAD, Math.round(H * 0.55))
     while (
       coverSize + COVER_GAP + stackHeight(f, f.titleMax, m.commentLines.length) > maxContentH &&
@@ -440,15 +462,13 @@ export function renderShareCard(
     }
     const blockH = coverSize + COVER_GAP + stackHeight(f, m.titleLines.length, m.commentLines.length)
     coverX = Math.round((W - coverSize) / 2)
-    coverY = Math.max(PAGE_PAD, Math.round((H - FOOTER_ZONE - blockH) / 2))
+    coverY = Math.max(PAGE_PAD, Math.round((H - blockH) / 2))
     textX = PAGE_PAD
     textTop = coverY + coverSize + COVER_GAP
     drawBackground(ctx, W, H, W / 2, coverY + coverSize * 0.35, rgb)
     drawCover(ctx, coverX, coverY, coverSize, cover, rgb)
     drawStack(ctx, spec, textX, textTop, maxTextW, f, m)
   }
-
-  drawFooter(ctx, H, horizontal ? H_PAGE_PAD : PAGE_PAD, spec.accentHex)
 }
 
 /* ------------------------------------------------------------------------
