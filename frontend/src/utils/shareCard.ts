@@ -344,7 +344,10 @@ function drawCommentBottom(
   })
 }
 
-/** 海报底：对角线性渐变 + accent 双径向（封面中心 + 右下角极淡） */
+/**
+ * 海报底：对角线性渐变 + accent 光晕三层。
+ * 注意：封面径向的中心会被大封面遮挡，可见性靠「底部上升」与「外围衰减」两层保证。
+ */
 function drawBackground(
   ctx: CanvasRenderingContext2D,
   W: number,
@@ -354,18 +357,26 @@ function drawBackground(
   rgb: [number, number, number],
 ) {
   const lin = ctx.createLinearGradient(0, 0, W, H)
-  lin.addColorStop(0, '#141414')
+  lin.addColorStop(0, '#181818')
   lin.addColorStop(1, '#0a0a0a')
   ctx.fillStyle = lin
   ctx.fillRect(0, 0, W, H)
   const [ar, ag, ab] = rgb
+  // 自底部上升（大片留白区，光晕最显眼处）
+  const up = ctx.createLinearGradient(0, H, 0, H * 0.42)
+  up.addColorStop(0, `rgba(${ar}, ${ag}, ${ab}, 0.16)`)
+  up.addColorStop(1, 'rgba(0, 0, 0, 0)')
+  ctx.fillStyle = up
+  ctx.fillRect(0, 0, W, H)
+  // 封面外围径向（中心被遮挡，中段保持可见光晕）
   const r1 = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.45)
-  r1.addColorStop(0, `rgba(${ar}, ${ag}, ${ab}, 0.12)`)
+  r1.addColorStop(0, `rgba(${ar}, ${ag}, ${ab}, 0.18)`)
+  r1.addColorStop(0.55, `rgba(${ar}, ${ag}, ${ab}, 0.08)`)
   r1.addColorStop(1, 'rgba(0, 0, 0, 0)')
   ctx.fillStyle = r1
   ctx.fillRect(0, 0, W, H)
   const r2 = ctx.createRadialGradient(W, H, 0, W, H, W * 0.35)
-  r2.addColorStop(0, `rgba(${ar}, ${ag}, ${ab}, 0.05)`)
+  r2.addColorStop(0, `rgba(${ar}, ${ag}, ${ab}, 0.08)`)
   r2.addColorStop(1, 'rgba(0, 0, 0, 0)')
   ctx.fillStyle = r2
   ctx.fillRect(0, 0, W, H)
