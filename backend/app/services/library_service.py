@@ -139,8 +139,13 @@ async def _albums_state(cookie: dict, user_id: int, need: int) -> dict:
     need = max(0, min(int(need), MAX_ITEMS))
     while len(state["items"]) < need and not state["complete"]:
         page_offset = len(state["items"])
+        # 上游单批放大到 100（原 40）：搜索补齐路径调用量减半；
+        # 不敢再大——SDK/QuickJS 对大响应有崩溃风险（见 PAGE 注释），
+        # worker 崩溃虽可拉起重试，但搜索场景连续崩不划算。
+        # 上游若钳批返回更少，offset 按实际条数推进，循环自然多走几轮
+        fetch = min(100, need - page_offset)
         resp = await _ncm_get(
-            "album_sublist", cookie=cookie, limit=PAGE, offset=page_offset
+            "album_sublist", cookie=cookie, limit=fetch, offset=page_offset
         )
         body = resp.body if isinstance(resp.body, dict) else {}
         code = int(body.get("code") or resp.status or 0)
@@ -170,6 +175,8 @@ async def _albums_state(cookie: dict, user_id: int, need: int) -> dict:
         if isinstance(more, bool):
             state["complete"] = not more
         elif len(page) < PAGE:
+            # 注意用 PAGE（40）而非 fetch：上游可能静默钳批（请求 100 返 52），
+            # 用 fetch 判定会把「还有余量」误判为到尾
             state["complete"] = True
         if not page:
             state["complete"] = True
