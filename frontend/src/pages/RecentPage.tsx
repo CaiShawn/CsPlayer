@@ -27,9 +27,9 @@ import {
 type RecentTab = 'song' | 'album' | 'playlist'
 
 const TABS: { id: RecentTab; label: string; hint: string }[] = [
-  { id: 'song', label: '单曲', hint: '最多 50 首' },
-  { id: 'album', label: '专辑', hint: '最多 10 张' },
-  { id: 'playlist', label: '歌单', hint: '最多 10 张' },
+  { id: 'song', label: '单曲', hint: '最近 50 首' },
+  { id: 'album', label: '专辑', hint: '最近 10 张' },
+  { id: 'playlist', label: '歌单', hint: '最近 10 张' },
 ]
 
 export function RecentPage() {

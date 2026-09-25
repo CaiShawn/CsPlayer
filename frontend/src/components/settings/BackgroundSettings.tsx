@@ -161,7 +161,7 @@ export function BackgroundSettings() {
     >
       <SettingRow
         label="背景启用"
-        hint="开启后界面表面变半透明以透出背景图；关闭立即回到实色界面（与 v0.1.5 一致）"
+        hint="开启后界面表面变半透明以透出背景图；关闭立即回到实色界面"
       >
         <Switch
           label="背景启用"
