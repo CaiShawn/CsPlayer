@@ -137,6 +137,7 @@ async def _albums_state(cookie: dict, user_id: int, need: int) -> dict:
         state = {"items": [], "total": 0, "complete": False}
 
     need = max(0, min(int(need), MAX_ITEMS))
+    empty_streak = int(state.get("empty_streak") or 0)
     while len(state["items"]) < need and not state["complete"]:
         page_offset = len(state["items"])
         # 上游单批放大到 100（原 40）：搜索补齐路径调用量减半；
@@ -179,9 +180,18 @@ async def _albums_state(cookie: dict, user_id: int, need: int) -> dict:
             # 用 fetch 判定会把「还有余量」误判为到尾
             state["complete"] = True
         if not page:
-            state["complete"] = True
+            # totalCount 说还有但上游给空页：可能是抖动/限流，连续 2 次空页才认到尾
+            empty_streak += 1
+            known_total = int(state.get("total") or 0)
+            if empty_streak >= 2 or known_total <= len(state["items"]):
+                state["complete"] = True
+        else:
+            empty_streak = 0
         if state["complete"]:
-            state["total"] = len(state["items"])
+            # total 不缩水：complete 可能来自上游抖动/误判，已知 totalCount 更可信
+            # （曾因此把 700 缩成 440 并随缓存固化，前端显示「共 440 张」）
+            state["total"] = max(int(state.get("total") or 0), len(state["items"]))
+        state["empty_streak"] = empty_streak
         cache.set(key, state, settings.cache_ttl["album_sublist"])
     return state
 

@@ -24,6 +24,8 @@ export function ShelfPage() {
   // （仅搜已加载会漏掉未滚动到的收藏，结果不可信；后端加参数也得拉全量，成本同源）
   const [query, setQuery] = useState('')
   const [loadingAll, setLoadingAll] = useState(false)
+  const albumsRef = useRef<AlbumBrief[]>([]) // 镜像（补齐循环内去重用，避免在 setState updater 里做带副作用的计数）
+  albumsRef.current = albums
   const albumsCountRef = useRef(0) // 已加载张数（补齐循环内同步推进）
   const hasMoreRef = useRef(false) // 补齐循环读 ref，避免 state 变更反复取消重启
   const totalRef = useRef(0)
@@ -71,7 +73,7 @@ export function ShelfPage() {
       albumsCountRef.current = replace ? items.length : albumsCountRef.current + items.length
       totalRef.current = data.total || 0
       hasMoreRef.current = items.length > 0 && !!data.hasMore
-      setTotal(data.total || 0)
+      setTotal(Math.max(totalRef.current, albumsCountRef.current))
       // 零进展防护：无新条目时 offset 不会推进，按到尾处理（防连续加载链死循环）
       setHasMore(hasMoreRef.current)
     } catch (e) {
@@ -103,13 +105,15 @@ export function ShelfPage() {
             setHasMore(false)
             return
           }
-          setAlbums((prev) => {
-            const seen = new Set(prev.map((p) => p.id))
-            const fresh = items.filter((i) => !seen.has(i.id))
+          // 计数在 updater 外做：StrictMode 会双调用 updater，内部改 ref 会被多记一倍
+          const seen = new Set(albumsRef.current.map((p) => p.id))
+          const fresh = items.filter((i) => !seen.has(i.id))
+          if (fresh.length) {
             albumsCountRef.current += fresh.length
-            return [...prev, ...fresh]
-          })
-          totalRef.current = data.total || 0
+            const append = fresh
+            setAlbums((prev) => [...prev, ...append])
+          }
+          totalRef.current = Math.max(data.total || 0, totalRef.current, albumsCountRef.current)
           setTotal(totalRef.current)
           if (!data.hasMore || items.length < 200) {
             hasMoreRef.current = false
@@ -164,7 +168,7 @@ export function ShelfPage() {
           {loadingAll
             ? `正在加载全部收藏（${albums.length} / ${total}）…`
             : kw
-              ? `匹配 ${visible.length} 张 · 共 ${albums.length} 张`
+              ? `匹配 ${visible.length} 张 · 共 ${Math.max(total, albums.length)} 张`
               : `收藏的专辑${total > 0 ? ` · 共 ${total} 张` : ''}`}
           {hasSelection ? ` · 已选 ${picked.length} 张` : ''}
         </p>
