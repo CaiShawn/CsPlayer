@@ -131,11 +131,11 @@ function formatTotalDuration(ms: number): string {
 }
 
 export const COLLAGE_MIN = 2
-export const COLLAGE_MAX = 9
+export const COLLAGE_MAX = 20
 
-/** 拼贴网格行列：2→2 列、3–4→2 列、5–9→3 列（近正方画布） */
+/** 拼贴网格行列：2→2 列、3–4→2 列、5–9→3 列、10–20→4 列（20=4×5 正好铺满） */
 export function collageGrid(count: number): { cols: number; rows: number } {
-  const cols = count <= 2 ? 2 : count <= 4 ? 2 : 3
+  const cols = count <= 2 ? 2 : count <= 4 ? 2 : count <= 9 ? 3 : 4
   return { cols, rows: Math.max(1, Math.ceil(count / cols)) }
 }
 
