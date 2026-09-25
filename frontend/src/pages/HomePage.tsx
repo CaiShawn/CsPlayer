@@ -1,22 +1,13 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { libraryApi } from '../api'
-import { Cover } from '../components/common/Cover'
-import { useContextMenuStore } from '../stores/contextMenuStore'
 import { useAuthStore } from '../stores/authStore'
 import { useLikesStore } from '../stores/likesStore'
-import { usePlayerStore } from '../stores/playerStore'
-import type { SongSummary } from '../types'
-import { artistNames, formatDuration } from '../utils/format'
-import {
-  clearRecentPlays,
-  loadRecentPlays,
-  subscribeRecentPlays,
-} from '../utils/recentPlays'
 
-/* 模块入口：文案与侧栏统一（S3-1，设计 §4.4） */
+/* 模块入口：文案与侧栏统一（S3-1，设计 §4.4）；近来听为本地记录入口（S4） */
 const ENTRIES = [
   { to: '/like', title: '我喜欢', desc: '云端红心歌曲，设备同步', icon: '♥' },
+  { to: '/recent', title: '近来听', desc: '最近播放，本地记录（暂）', icon: '↺' },
   { to: '/library', title: '音乐库', desc: '我的歌单：创建与收藏的歌单', icon: '☰' },
   { to: '/record', title: '自听榜', desc: '云端听歌排行', icon: '⏱' },
   { to: '/shelf', title: '唱片架', desc: '收藏的专辑', icon: '♫' },
@@ -64,17 +55,6 @@ export function HomePage() {
     }
   }, [dataVersion])
 
-  /* 最近播放：本地记录（S3-2），点击续播、右键沿用歌曲右键菜单 */
-  const recents = useSyncExternalStore(subscribeRecentPlays, loadRecentPlays)
-
-  const playRecent = (index: number) => {
-    const playable = recents.filter((t) => t.playable)
-    const song = recents[index]
-    if (!song?.playable) return
-    const start = playable.findIndex((t) => t.id === song.id)
-    usePlayerStore.getState().playSongs(playable, Math.max(0, start), '最近播放')
-  }
-
   return (
     <div className="p-8 pb-28">
       {/* 欢迎条 */}
@@ -121,8 +101,8 @@ export function HomePage() {
         </div>
       )}
 
-      {/* 模块入口 ×4 */}
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* 模块入口 ×5 */}
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {ENTRIES.map((c) => (
           <Link
             key={c.to}
@@ -140,66 +120,6 @@ export function HomePage() {
         ))}
       </div>
 
-      {/* 最近播放：本地记录，只存本机、不上传 */}
-      <section className="mt-10">
-        <div className="flex items-end justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-neutral-100">最近播放</h2>
-            <p className="mt-0.5 text-xs text-neutral-500">
-              只保存在本机浏览器，不上传 · 最多 50 条
-            </p>
-          </div>
-          {recents.length > 0 && (
-            <button
-              type="button"
-              onClick={clearRecentPlays}
-              className="text-xs text-neutral-500 hover:text-neutral-200"
-            >
-              清空
-            </button>
-          )}
-        </div>
-
-        {recents.length === 0 ? (
-          <div className="mt-4 rounded-xl border border-neutral-800 px-4 py-8 text-center text-sm text-neutral-500">
-            还没有播放记录，听过的歌会出现在这里
-          </div>
-        ) : (
-          <div className="mt-4 overflow-hidden rounded-xl border border-neutral-800">
-            {recents.map((song: SongSummary, index) => {
-              return (
-                <button
-                  key={`${song.id}-${index}`}
-                  type="button"
-                  onClick={() => playRecent(index)}
-                  onContextMenu={(e) =>
-                    useContextMenuStore.getState().openForEvent(e, {
-                      kind: 'song',
-                      song,
-                      songs: recents,
-                      index,
-                    })
-                  }
-                  className={`group flex w-full items-center gap-3 px-4 py-[var(--space-row-y)] text-left text-sm transition-colors hover:bg-neutral-800/60 ${
-                    song.playable ? '' : 'opacity-40'
-                  }`}
-                >
-                  <Cover url={song.coverUrl} className="h-10 w-10 shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-neutral-100">{song.name}</div>
-                    <div className="truncate text-xs text-neutral-500">
-                      {artistNames(song.artists)}
-                    </div>
-                  </div>
-                  <span className="shrink-0 text-xs tabular-nums text-neutral-500">
-                    {formatDuration(song.durationMs)}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        )}
-      </section>
     </div>
   )
 }
