@@ -5,6 +5,7 @@ import { useLikesStore } from '../../stores/likesStore'
 import { useUiStore } from '../../stores/uiStore'
 import { usePlayerStore } from '../../stores/playerStore'
 import { useAudioEngine } from '../../hooks/useAudioEngine'
+import { useHotkeys } from '../../hooks/useHotkeys'
 import { ContextMenu } from '../common/ContextMenu'
 import { BackgroundLayer } from '../common/BackgroundLayer'
 import { ShareCardModal } from '../share/ShareCardModal'
@@ -16,6 +17,7 @@ import { TopBar } from './TopBar'
 
 export function MainLayout() {
   useAudioEngine()
+  useHotkeys()
   const location = useLocation()
   const onHome = location.pathname === '/home'
   const dataVersion = useAuthStore((s) => s.dataVersion)

@@ -91,7 +91,7 @@ export function PlayerBar() {
               type="button"
               onClick={togglePlay}
               className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-neutral-950 hover:bg-accent-hover"
-              title={playing ? '暂停' : '播放'}
+              title={playing ? '暂停（空格）' : '播放（空格）'}
             >
               {playing ? <PauseIcon /> : '▶'}
             </button>

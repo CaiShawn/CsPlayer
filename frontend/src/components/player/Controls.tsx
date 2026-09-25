@@ -104,7 +104,6 @@ export function VolumeControl() {
         label="音量"
         format={(v) => (muted ? '静音' : `${Math.round(v * 100)}%`)}
         wheel
-        keyboard={false} /* 键盘调音量暂时关闭，随 v0.1.7 快捷键扩展回归；恢复 = 删掉这一行 */
       />
       {/* 右侧等宽占位：与左占位对称，保证滑轨居中 */}
       <span className="min-w-0 flex-1" aria-hidden />

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
-import { isEditableTarget, useContextMenuStore } from '../../stores/contextMenuStore'
+import { useUiStore } from '../../stores/uiStore'
 import { usePlayerStore } from '../../stores/playerStore'
 import {
   clearRecentSearch,
@@ -55,21 +55,15 @@ export function TopBar() {
     return () => window.clearTimeout(t)
   }, [value, onSearchPage, currentQ, navigate])
 
-  // 全局快捷键：/ 或 Ctrl+K 聚焦搜索框（输入框内不劫持）
+  // 搜索框聚焦动作注册给全局快捷键 useHotkeys（/ 或 Ctrl/Cmd+K）；卸载即注销。
+  // 具体按键守卫与触发规则统一在 useHotkeys，本组件只提供聚焦动作
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (isEditableTarget(e.target)) return
-      const key = e.key.toLowerCase()
-      if (e.key === '/' || ((e.ctrlKey || e.metaKey) && key === 'k')) {
-        e.preventDefault()
-        useContextMenuStore.getState().close()
-        inputRef.current?.focus()
-        inputRef.current?.select()
-        setShowRecent(true)
-      }
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
+    useUiStore.getState().setSearchFocus(() => {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+      setShowRecent(true)
+    })
+    return () => useUiStore.getState().setSearchFocus(null)
   }, [])
 
   // 点击搜索区以外关闭最近搜索面板

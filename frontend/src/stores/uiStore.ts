@@ -17,6 +17,10 @@ interface UiState {
   shareSource: ShareCardSource | null
   openShareCard: (source: ShareCardSource) => void
   closeShareCard: () => void
+  /** 搜索框聚焦动作（TopBar 挂载时注册，全局快捷键 useHotkeys 的 /、Ctrl/Cmd+K 调用）；
+   *  null = 未挂载（快捷键静默无操作） */
+  searchFocus: (() => void) | null
+  setSearchFocus: (fn: (() => void) | null) => void
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -25,4 +29,6 @@ export const useUiStore = create<UiState>((set) => ({
   shareSource: null,
   openShareCard: (shareSource) => set({ shareSource }),
   closeShareCard: () => set({ shareSource: null }),
+  searchFocus: null,
+  setSearchFocus: (fn) => set({ searchFocus: fn }),
 }))
