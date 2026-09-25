@@ -227,7 +227,7 @@ export function QueuePanel() {
       className={
         queuePinned
           ? 'flex w-80 shrink-0 flex-col border-l border-neutral-800 bg-neutral-950'
-          : 'fixed bottom-20 right-0 top-16 z-50 flex w-80 flex-col border-l border-neutral-800 bg-neutral-950 shadow-2xl'
+          : 'fixed bottom-20 right-0 top-14 z-50 flex w-80 flex-col border-l border-neutral-800 bg-neutral-950 shadow-2xl'
       }
     >
       <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
