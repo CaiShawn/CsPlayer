@@ -508,7 +508,12 @@ async def _invalidate_like_cache(
 
 
 async def toggle_like(cookie: dict, user_id: int, song_id: int, like: bool) -> LikeResult:
-    resp = await ncm_call("like", cookie=cookie, id=song_id, like=like)
+    # 上游 like.js：`query.like == 'false' ? false : true` —— 只认字符串 'false'，
+    # 传布尔 false 会被判成 true（JS 里 false == 'false' 为假），取消喜欢变成再红心一遍
+    # 且接口返回成功。故必须传 "true" / "false" 字符串（2026-09 实测定位）。
+    resp = await ncm_call(
+        "like", cookie=cookie, id=song_id, like=str(like).lower()
+    )
     body: dict[str, Any] = resp.body or {}
     code = int(body.get("code") or resp.status or 0)
 
