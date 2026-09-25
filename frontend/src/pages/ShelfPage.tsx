@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { libraryApi, PAGE_SIZE } from '../api'
 import type { AlbumBrief } from '../types'
@@ -7,6 +7,8 @@ import { Empty, Loading, LoadingMore } from '../components/common/Ui'
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll'
 import { useAuthStore } from '../stores/authStore'
 import { useContextMenuStore } from '../stores/contextMenuStore'
+import { useUiStore } from '../stores/uiStore'
+import { COLLAGE_MAX, COLLAGE_MIN } from '../utils/shareCard'
 
 export function ShelfPage() {
   const dataVersion = useAuthStore((s) => s.dataVersion)
@@ -17,6 +19,35 @@ export function ShelfPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState('')
   const [error, setError] = useState('')
+
+  // S2-2 搜索：前端过滤已加载（名称/歌手包含，不区分大小写）
+  const [query, setQuery] = useState('')
+  const kw = query.trim().toLowerCase()
+  const visible = useMemo(
+    () =>
+      kw
+        ? albums.filter(
+            (a) => a.name.toLowerCase().includes(kw) || a.artistName.toLowerCase().includes(kw),
+          )
+        : albums,
+    [albums, kw],
+  )
+
+  // S2-3 多选：hover 勾选圈，选中顺序即拼贴顺序
+  const [picked, setPicked] = useState<AlbumBrief[]>([])
+  const hasSelection = picked.length > 0
+
+  const togglePick = useCallback((a: AlbumBrief) => {
+    setPicked((prev) => {
+      const i = prev.findIndex((p) => p.id === a.id)
+      if (i >= 0) return prev.filter((p) => p.id !== a.id)
+      if (prev.length >= COLLAGE_MAX) {
+        useUiStore.getState().setToast(`拼贴卡最多选 ${COLLAGE_MAX} 张`)
+        return prev
+      }
+      return [...prev, a]
+    })
+  }, [])
 
   const load = useCallback(async (offset: number, replace: boolean) => {
     if (replace) {
@@ -54,21 +85,39 @@ export function ShelfPage() {
     }
   }, [dataVersion, load])
 
-  // 分批加载：滚动到底自动续拉下一批；失败断链（loadMoreError）停发，待手动重试
+  // 分批加载：滚动到底自动续拉下一批；失败断链（loadMoreError）停发，待手动重试；
+  // 搜索过滤态隐藏哨兵（过滤只针对已加载范围，续拉语义混乱）
   const sentinelRef = useInfiniteScroll(
     () => {
-      if (loadingMore || !hasMore || loadMoreError) return
+      if (loadingMore || !hasMore || loadMoreError || kw) return
       void load(albums.length, false)
     },
-    hasMore && !loadingMore && !loadMoreError,
+    hasMore && !loadingMore && !loadMoreError && !kw,
   )
+
+  const openCollage = () => {
+    if (picked.length < COLLAGE_MIN) return
+    useUiStore.getState().openShareCard({ kind: 'collage', albums: [...picked] })
+  }
 
   return (
     <div className="p-8 pb-24">
-      <h1 className="text-2xl font-bold text-neutral-50">唱片架</h1>
-      <p className="mt-1 text-sm text-neutral-500">
-        收藏的专辑{total > 0 ? ` · 共 ${total} 张` : ''}
-      </p>
+      <h1 className="text-2xl font-bold text-neutral-50">唱片墙</h1>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-neutral-500">
+          {kw
+            ? `匹配 ${visible.length} 张 · 已加载 ${albums.length}${total > albums.length ? ` / ${total}` : ''} 张`
+            : `收藏的专辑${total > 0 ? ` · 共 ${total} 张` : ''}`}
+          {hasSelection ? ` · 已选 ${picked.length} 张` : ''}
+        </p>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="搜索已加载的专辑或歌手"
+          className="w-full rounded-xl border border-neutral-800 bg-neutral-950/60 px-3 py-1.5 text-sm text-neutral-100 placeholder:text-neutral-600 focus:border-accent/50 focus:outline-none sm:w-72"
+        />
+      </div>
 
       <div className="mt-6">
         {loading ? (
@@ -77,28 +126,66 @@ export function ShelfPage() {
           <div className="text-center text-sm text-red-400">{error}</div>
         ) : albums.length === 0 ? (
           <Empty text="暂无收藏的专辑" />
+        ) : visible.length === 0 ? (
+          <Empty text={`没有匹配的专辑（仅搜索已加载的 ${albums.length} 张）`} />
         ) : (
           <>
             <div className="grid grid-cols-2 gap-[var(--space-card-gap)] sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-              {albums.map((a) => (
-                <Link
-                  key={a.id}
-                  to={`/album/${a.id}`}
-                  onContextMenu={(e) =>
-                    useContextMenuStore.getState().openForEvent(e, { kind: 'album', album: a })
-                  }
-                  className="group rounded-[var(--radius-cover)] border border-transparent bg-neutral-900/40 p-3 transition hover:border-neutral-800 hover:bg-neutral-900"
-                >
-                  <Cover url={a.coverUrl} className="aspect-square w-full" />
-                  <div className="mt-2 truncate text-sm text-neutral-100">{a.name}</div>
-                  <div className="mt-0.5 truncate text-xs text-neutral-500">{a.artistName}</div>
-                </Link>
-              ))}
+              {visible.map((a) => {
+                const isPicked = picked.some((p) => p.id === a.id)
+                return (
+                  <Link
+                    key={a.id}
+                    to={`/album/${a.id}`}
+                    onClick={(e) => {
+                      // 多选态：点击封面=切换选中，不导航
+                      if (hasSelection) {
+                        e.preventDefault()
+                        togglePick(a)
+                      }
+                    }}
+                    onContextMenu={(e) =>
+                      useContextMenuStore.getState().openForEvent(e, { kind: 'album', album: a })
+                    }
+                    className={`group rounded-[var(--radius-cover)] border bg-neutral-900/40 p-3 transition hover:bg-neutral-900 ${
+                      isPicked ? 'border-accent/60' : 'border-transparent hover:border-neutral-800'
+                    }`}
+                  >
+                    <div className="relative overflow-hidden rounded-[var(--radius-cover)] shadow-lg shadow-black/40 transition duration-200 group-hover:-translate-y-1 group-hover:shadow-xl group-hover:shadow-black/50">
+                      <Cover url={a.coverUrl} className="aspect-square w-full" />
+                      {/* 光泽：右上斜向高光，hover 增强 */}
+                      <span className="pointer-events-none absolute inset-0 rounded-[var(--radius-cover)] bg-gradient-to-br from-white/[0.08] via-transparent to-transparent opacity-50 transition group-hover:opacity-100" />
+                      {/* 勾选圈：hover 浮现；选中常驻；独立命中区不触发导航 */}
+                      <span
+                        role="checkbox"
+                        aria-checked={isPicked}
+                        aria-label={isPicked ? `取消选择 ${a.name}` : `选择 ${a.name}`}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          togglePick(a)
+                        }}
+                        className={`absolute left-2 top-2 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border text-xs transition ${
+                          isPicked
+                            ? 'border-transparent bg-accent text-neutral-950 opacity-100'
+                            : `border-white/60 bg-black/40 text-transparent ${
+                                hasSelection ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                              }`
+                        }`}
+                      >
+                        ✓
+                      </span>
+                    </div>
+                    <div className="mt-2 truncate text-sm text-neutral-100">{a.name}</div>
+                    <div className="mt-0.5 truncate text-xs text-neutral-500">{a.artistName}</div>
+                  </Link>
+                )
+              })}
             </div>
             {/* 分批加载哨兵：整块底部空白（列表底 → 播放条上沿）即本元素 h-36=144px，
                 「加载中」在空白正中垂直居中；-mb-28 抵消 pb-24×2 超出播放条的 112px，
                 整体留白不变（哨兵上沿仍在列表底部，滚动触发时机不受影响） */}
-            {hasMore && (
+            {hasMore && !kw && (
               <div ref={sentinelRef} className="-mb-28 flex h-36 items-center justify-center">
                 {loadingMore ? (
                   <LoadingMore />
@@ -116,6 +203,43 @@ export function ShelfPage() {
           </>
         )}
       </div>
+
+      {/* 多选操作条：悬浮于播放条上方 */}
+      {hasSelection && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-24 z-40 flex justify-center px-4">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-neutral-800 bg-neutral-900/95 px-5 py-2.5 shadow-xl backdrop-blur">
+            <span className="text-sm text-neutral-200">
+              已选 <span className="font-medium text-accent">{picked.length}</span> 张
+              {picked.length < COLLAGE_MIN && (
+                <span className="ml-1 text-xs text-neutral-500">（再选 1 张起可拼贴）</span>
+              )}
+            </span>
+            <button
+              type="button"
+              disabled={picked.length < COLLAGE_MIN}
+              onClick={openCollage}
+              className="rounded-full bg-accent px-4 py-1.5 text-xs font-medium text-neutral-950 transition hover:bg-accent-hover disabled:opacity-40"
+            >
+              分享拼贴卡
+            </button>
+            <button
+              type="button"
+              onClick={() => setPicked([])}
+              className="rounded-full border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300 transition hover:bg-neutral-800"
+            >
+              清空
+            </button>
+            <button
+              type="button"
+              onClick={() => setPicked([])}
+              className="text-neutral-500 transition hover:text-neutral-200"
+              aria-label="退出多选"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
