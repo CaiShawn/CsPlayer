@@ -397,7 +397,22 @@ export function SettingsPage() {
           <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 px-4 py-4 text-xs leading-5 text-neutral-500">
             <div className="text-sm text-neutral-200">CsPlayer v{APP_VERSION}</div>
             <div className="mt-1">第三方网易云 Web 播放器（Third-party web player for NCM），非网易官方产品。</div>
-            <div>本项目仅供学习使用，请尊重版权，支持正版音乐。</div>
+
+            <div className="mt-1">
+              觉得好用的话，点个 Star 就是最大的鼓励；碰到 Bug 或者想要什么功能，
+              直接提 Issue 就好；想动手一起改，PR 随时欢迎。开源地址：
+              <a
+                href="https://github.com/CaiShawn/CsPlayer"
+                target="_blank"
+                rel="noreferrer"
+                className="text-accent-soft hover:underline"
+              >
+                github.com/CaiShawn/CsPlayer
+              </a>
+            </div>
+          </div>
+          <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 px-4 py-4 text-xs leading-5">
+            <div className="font-semibold text-neutral-200">本项目仅供学习使用，请尊重版权，支持正版音乐。</div>
           </div>
         </SettingSection>
       </div>
