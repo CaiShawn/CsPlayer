@@ -3,7 +3,7 @@
  *
  * 手绘 canvas 2D（零依赖），五档比例（1:1 / 3:4 / 9:16 / 4:3 / 16:9）：
  * 竖版单栏（封面在上）、横版双栏（封面左 + 文案右），同一文本栈绘制器；
- * 主题 accent 用在三处结构点（徽标 / 评论竖线 / 元信息分隔点）+ 背景渐变，
+ * 主题 accent 用在两处结构点（徽标 / 评论竖线）+ 背景渐变，
  * 其余中性色。细节精修：封面投影 + 微描边、标题字距、元信息前置分隔点。
  *
  * 本模块纯渲染，不 import 任何 store——accent hex 由调用方从 settingsStore 派生；
@@ -74,7 +74,7 @@ const FONT_STACK = 'system-ui, "PingFang SC", "Microsoft YaHei", sans-serif'
 export function buildShareCardSpec(source: ShareCardSource, accentHex: string): ShareCardSpec | null {
   if (source.kind === 'song') {
     const { song } = source
-    const meta = [song.albumName, formatDuration(song.durationMs)].filter(Boolean).join(' ')
+    const meta = [song.albumName, formatDuration(song.durationMs)].filter(Boolean).join(' · ')
     return {
       kind: 'song',
       title: song.name,
@@ -106,7 +106,7 @@ export function albumSpecFromDetail(detail: AlbumCardData, accentHex: string): S
     kind: 'album',
     title: detail.name,
     subtitle: detail.artistName,
-    meta: `${detail.tracks.length} 首 ${formatTotalDuration(totalMs)}`,
+    meta: `${detail.tracks.length} 首 · ${formatTotalDuration(totalMs)}`,
     coverUrl: detail.coverUrl,
     accentHex,
   }
@@ -270,7 +270,6 @@ function stackHeight(f: Fonts, titleLines: number): number {
 
 /**
  * 文本栈绘制（徽标 → 标题 → 副题 → 元信息），返回实际占用高度。
- * 元信息前置 accent 分隔点。
  */
 function drawStack(
   ctx: CanvasRenderingContext2D,
@@ -310,14 +309,10 @@ function drawStack(
   ctx.fillText(ellipsize(ctx, spec.subtitle, maxW), x, y + pxOf(f.subtitle))
   y += f.subtitleLh + 18
 
-  // 元信息（前置 accent 分隔点）
-  ctx.fillStyle = spec.accentHex
-  ctx.beginPath()
-  ctx.arc(x + 4, y + 22, 4, 0, Math.PI * 2)
-  ctx.fill()
+  // 元信息
   ctx.font = `${f.meta} ${FONT_STACK}`
   ctx.fillStyle = '#a3a3a3'
-  ctx.fillText(ellipsize(ctx, spec.meta, maxW - 18), x + 18, y + 26)
+  ctx.fillText(ellipsize(ctx, spec.meta, maxW), x, y + 26)
   y += 36
 
   return y - start
