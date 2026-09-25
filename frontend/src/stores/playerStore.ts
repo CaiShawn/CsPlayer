@@ -4,6 +4,7 @@ import { findLyricIndex } from '../utils/lyric'
 import { pushRecentPlay } from '../utils/recentPlays'
 import {
   LYRIC_COLLAPSED_KEY,
+  QUEUE_PIN_KEY,
   QUEUE_SESSION_KEY,
   VOLUME_KEY,
   useSettingsStore,
@@ -52,6 +53,8 @@ interface PlayerState {
   lyric: Lyric
   currentLyricIndex: number
   queueVisible: boolean
+  /** 队列钉住（S3）：true=右侧常驻占位（主内容缩窄、外点不收）；false=默认抽屉 */
+  queuePinned: boolean
   /** session-only lyric panel collapse preference */
   lyricCollapsed: boolean
   /** bumps when a new song should be loaded into audio element */
@@ -86,6 +89,9 @@ interface PlayerState {
   syncLyricIndex: (timeSec: number) => void
   toggleQueue: () => void
   setQueueVisible: (v: boolean) => void
+  /** 钉住/取消钉住（S3）：钉住时确保面板可见并收歌词（互斥） */
+  toggleQueuePinned: () => void
+  setQueuePinned: (v: boolean) => void
   toggleLyric: () => void
   setLyricCollapsed: (v: boolean) => void
   handleEnded: () => void
@@ -155,6 +161,23 @@ function initialLyricCollapsed(): boolean {
 function persistLyricCollapsed(collapsed: boolean) {
   try {
     localStorage.setItem(LYRIC_COLLAPSED_KEY, collapsed ? '1' : '0')
+  } catch {
+    // ignore
+  }
+}
+
+/** 队列钉住状态（S3）：默认抽屉（不钉住）；刷新跟随，「清除本地数据」后回抽屉 */
+function initialQueuePinned(): boolean {
+  try {
+    return localStorage.getItem(QUEUE_PIN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function persistQueuePinned(pinned: boolean) {
+  try {
+    localStorage.setItem(QUEUE_PIN_KEY, pinned ? '1' : '0')
   } catch {
     // ignore
   }
@@ -253,6 +276,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   lyric: emptyLyric,
   currentLyricIndex: -1,
   queueVisible: false,
+  queuePinned: initialQueuePinned(),
   lyricCollapsed: initialLyricCollapsed(),
   loadToken: 0,
 
@@ -485,17 +509,54 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     if (idx !== currentLyricIndex) set({ currentLyricIndex: idx })
   },
 
-  toggleQueue: () => set({ queueVisible: !get().queueVisible }),
+  toggleQueue: () => {
+    const v = !get().queueVisible
+    // 互斥（验收决定）：开队列收歌词
+    set(v ? { queueVisible: true, lyricCollapsed: true } : { queueVisible: false })
+    if (v) persistLyricCollapsed(true)
+  },
   setQueueVisible: (v) => {
-    if (get().queueVisible !== v) set({ queueVisible: v })
+    if (get().queueVisible === v) return
+    if (v) {
+      // 互斥（验收决定）：队列打开时歌词不能同开
+      set({ queueVisible: true, lyricCollapsed: true })
+      persistLyricCollapsed(true)
+    } else {
+      set({ queueVisible: false })
+    }
+  },
+  toggleQueuePinned: () => {
+    const v = !get().queuePinned
+    set({ queuePinned: v })
+    persistQueuePinned(v)
+    if (v && !get().queueVisible) {
+      // 从关态直接钉住：拉起面板并收歌词（互斥）
+      set({ queueVisible: true, lyricCollapsed: true })
+      persistLyricCollapsed(true)
+    }
+  },
+  setQueuePinned: (v) => {
+    if (get().queuePinned === v) return
+    set({ queuePinned: v })
+    persistQueuePinned(v)
   },
   toggleLyric: () => {
     const v = !get().lyricCollapsed
-    set({ lyricCollapsed: v })
+    if (!v) {
+      // 互斥（验收决定）：开歌词收队列
+      set({ lyricCollapsed: false, queueVisible: false })
+    } else {
+      set({ lyricCollapsed: true })
+    }
     persistLyricCollapsed(v)
   },
   setLyricCollapsed: (v) => {
-    set({ lyricCollapsed: v })
+    if (!v && get().queueVisible) {
+      // 互斥（验收决定）：队列开着时不能展开歌词
+      set({ lyricCollapsed: false, queueVisible: false })
+    } else {
+      set({ lyricCollapsed: v })
+    }
     persistLyricCollapsed(v)
   },
 

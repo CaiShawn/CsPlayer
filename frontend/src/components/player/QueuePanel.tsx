@@ -104,6 +104,8 @@ export function QueuePanel() {
   const queueSource = usePlayerStore((s) => s.queueSource)
   const playing = usePlayerStore((s) => s.playing)
   const queueVisible = usePlayerStore((s) => s.queueVisible)
+  const queuePinned = usePlayerStore((s) => s.queuePinned)
+  const toggleQueuePinned = usePlayerStore((s) => s.toggleQueuePinned)
   const toggleQueue = usePlayerStore((s) => s.toggleQueue)
   const setQueueVisible = usePlayerStore((s) => s.setQueueVisible)
   const clearQueue = usePlayerStore((s) => s.clearQueue)
@@ -184,9 +186,10 @@ export function QueuePanel() {
 
   /* 面板外 pointerdown 即收起 + Esc 收起（设计 §4.1 b）：
    *  - 命中在面板内 / 右键菜单根内则不收起（菜单点击不误收起）；
-   *  - 不加遮罩，不拦截页面交互；副作用（点歌曲行顺带收起）为可接受的抽屉语义。 */
+   *  - 不加遮罩，不拦截页面交互；副作用（点歌曲行顺带收起）为可接受的抽屉语义；
+   *  - 钉住态（S3）：常驻，外点 / Esc 均不收起。 */
   useEffect(() => {
-    if (!queueVisible) return
+    if (!queueVisible || queuePinned) return
     const onDown = (e: PointerEvent) => {
       // 仅左键收起：右键（弹右键菜单）不影响队列
       if (e.button !== 0) return
@@ -214,14 +217,18 @@ export function QueuePanel() {
       document.removeEventListener('pointerdown', onDown)
       document.removeEventListener('keydown', onKey, true)
     }
-  }, [queueVisible, setQueueVisible])
+  }, [queueVisible, queuePinned, setQueueVisible])
 
   if (!queueVisible) return null
 
   return (
     <div
       ref={panelRef}
-      className="fixed bottom-20 right-0 top-16 z-50 flex w-80 flex-col border-l border-neutral-800 bg-neutral-950 shadow-2xl"
+      className={
+        queuePinned
+          ? 'flex w-80 shrink-0 flex-col border-l border-neutral-800 bg-neutral-950'
+          : 'fixed bottom-20 right-0 top-16 z-50 flex w-80 flex-col border-l border-neutral-800 bg-neutral-950 shadow-2xl'
+      }
     >
       <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
         <div className="min-w-0">
@@ -232,6 +239,18 @@ export function QueuePanel() {
           )}
         </div>
         <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={toggleQueuePinned}
+            title={queuePinned ? '取消钉住（回到抽屉）' : '钉住到右侧（常驻）'}
+            className={
+              queuePinned
+                ? 'text-accent hover:text-accent-soft'
+                : 'text-neutral-500 hover:text-neutral-200'
+            }
+          >
+            <IconPin />
+          </button>
           <button
             type="button"
             onClick={clearQueue}
@@ -271,5 +290,15 @@ export function QueuePanel() {
         ))}
       </div>
     </div>
+  )
+}
+
+/** 图钉图标（与细线图标同风格：stroke 1.3 / 16px） */
+function IconPin() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M5.5 2.5h5l-.7 4 2.7 2.2v1H3.5v-1L6.2 6.5z" />
+      <path d="M8 9.7V13.5" />
+    </svg>
   )
 }

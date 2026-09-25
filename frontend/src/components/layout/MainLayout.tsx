@@ -46,9 +46,10 @@ export function MainLayout() {
             <Outlet />
           </main>
           {showLyric && <LyricPanel />}
+          {/* 队列面板（S3）：钉住态为行内右侧占位（主内容缩窄），抽屉态 fixed 不占位；与歌词互斥（store 保证不同开） */}
+          <QueuePanel />
         </div>
         <PlayerBar />
-        <QueuePanel />
         {/* 全站唯一右键菜单实例（portal） */}
         <ContextMenu />
         {/* 分享卡片弹窗（v0.1.8 S1）：自取 uiStore.shareSource，无入参时为 null 不渲染 */}
