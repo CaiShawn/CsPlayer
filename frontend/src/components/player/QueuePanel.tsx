@@ -232,25 +232,27 @@ export function QueuePanel() {
     >
       <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
         <div className="min-w-0">
-          <div className="text-sm text-neutral-200">播放队列（{queue.length}）</div>
+          <div className="flex items-center gap-2 text-sm text-neutral-200">
+            <span className="truncate">播放队列（{queue.length}）</span>
+            <button
+              type="button"
+              onClick={toggleQueuePinned}
+              title={queuePinned ? '取消钉住（回到抽屉）' : '钉住到右侧（常驻）'}
+              className={
+                queuePinned
+                  ? 'shrink-0 text-accent hover:text-accent-soft'
+                  : 'shrink-0 text-neutral-500 hover:text-neutral-200'
+              }
+            >
+              <IconPin />
+            </button>
+          </div>
           {/* A2：队列来源标签 */}
           {queueSource && (
             <div className="mt-0.5 truncate text-xs text-neutral-500">来自 {queueSource}</div>
           )}
         </div>
         <div className="flex shrink-0 gap-2">
-          <button
-            type="button"
-            onClick={toggleQueuePinned}
-            title={queuePinned ? '取消钉住（回到抽屉）' : '钉住到右侧（常驻）'}
-            className={
-              queuePinned
-                ? 'text-accent hover:text-accent-soft'
-                : 'text-neutral-500 hover:text-neutral-200'
-            }
-          >
-            <IconPin />
-          </button>
           <button
             type="button"
             onClick={clearQueue}
