@@ -66,6 +66,7 @@ function Sidebar() {
       <nav className="flex-1 space-y-1 px-3 py-4">
         <NavItem to="/home" icon={<IconHome />}>首页</NavItem>
         <NavItem to="/like" icon={<IconHeart />}>我喜欢</NavItem>
+        <NavItem to="/recent" icon={<IconClock />}>近来听</NavItem>
         <div className="my-3 border-t border-neutral-800/80" />
         <NavItem to="/library" icon={<IconList />}>音乐库</NavItem>
         <NavItem to="/record" icon={<IconChart />}>自听榜</NavItem>
@@ -89,6 +90,15 @@ function IconHeart() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M8 13C4 10.5 2.5 8.5 3.2 6.4c.6-1.7 2.6-2.1 3.8-.8l1 1 1-1c1.2-1.3 3.2-.9 3.8.8.7 2.1-.8 4.1-4.8 6.6z" />
+    </svg>
+  )
+}
+
+function IconClock() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="8" cy="8" r="5.5" />
+      <path d="M8 4.8V8l2.4 1.6" />
     </svg>
   )
 }

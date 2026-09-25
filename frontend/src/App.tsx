@@ -14,6 +14,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { SearchPage } from './pages/SearchPage'
 import { ArtistPage } from './pages/ArtistPage'
 import { AlbumPage, PlaylistPage } from './pages/DetailPages'
+import { RecentPage } from './pages/RecentPage'
 import { Loading } from './components/common/Ui'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -93,6 +94,7 @@ export default function App() {
         <Route index element={<Navigate to="/home" replace />} />
         <Route path="home" element={<HomePage />} />
         <Route path="like" element={<LikePage />} />
+        <Route path="recent" element={<RecentPage />} />
         <Route path="record" element={<RecordPage />} />
         <Route path="shelf" element={<ShelfPage />} />
         <Route path="library" element={<LibraryPage />} />

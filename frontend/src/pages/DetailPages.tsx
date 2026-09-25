@@ -9,6 +9,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useLikesStore } from '../stores/likesStore'
 import { usePlayerStore } from '../stores/playerStore'
 import { useUiStore } from '../stores/uiStore'
+import { pushRecentAlbum, pushRecentPlaylist } from '../utils/recentPlays'
 
 export function PlaylistPage() {
   const { id } = useParams()
@@ -53,6 +54,14 @@ export function PlaylistPage() {
   const playAll = () => {
     const playable = detail.tracks.filter((t) => t.playable)
     if (!playable.length) return
+    pushRecentPlaylist({
+      id: detail.id,
+      name: detail.name,
+      coverUrl: detail.coverUrl,
+      trackCount: detail.trackCount,
+      creatorName: detail.creatorName,
+      subscribed: detail.subscribed,
+    })
     usePlayerStore.getState().playSongs(playable, 0, `歌单《${detail.name}》`)
   }
 
@@ -61,6 +70,14 @@ export function PlaylistPage() {
     const song = detail.tracks[index]
     if (!song?.playable) return
     const start = playable.findIndex((t) => t.id === song.id)
+    pushRecentPlaylist({
+      id: detail.id,
+      name: detail.name,
+      coverUrl: detail.coverUrl,
+      trackCount: detail.trackCount,
+      creatorName: detail.creatorName,
+      subscribed: detail.subscribed,
+    })
     usePlayerStore.getState().playSongs(playable, Math.max(0, start), `歌单《${detail.name}》`)
   }
 
@@ -101,6 +118,7 @@ export function AlbumPage() {
     id: number
     name: string
     coverUrl: string
+    artistId: number
     artistName: string
     description: string
     tracks: SongSummary[]
@@ -141,6 +159,13 @@ export function AlbumPage() {
   const playAll = () => {
     const playable = detail.tracks.filter((t) => t.playable)
     if (!playable.length) return
+    pushRecentAlbum({
+      id: detail.id,
+      name: detail.name,
+      coverUrl: detail.coverUrl,
+      artistId: detail.artistId,
+      artistName: detail.artistName,
+    })
     usePlayerStore.getState().playSongs(playable, 0, `专辑《${detail.name}》`)
   }
 
@@ -149,6 +174,13 @@ export function AlbumPage() {
     const song = detail.tracks[index]
     if (!song?.playable) return
     const start = playable.findIndex((t) => t.id === song.id)
+    pushRecentAlbum({
+      id: detail.id,
+      name: detail.name,
+      coverUrl: detail.coverUrl,
+      artistId: detail.artistId,
+      artistName: detail.artistName,
+    })
     usePlayerStore.getState().playSongs(playable, Math.max(0, start), `专辑《${detail.name}》`)
   }
 
