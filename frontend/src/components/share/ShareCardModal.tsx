@@ -153,10 +153,11 @@ export function ShareCardModal() {
     const dpr = Math.min(window.devicePixelRatio || 1, 3)
     const base = SHARE_CARD_SIZES[ratio]
     const scale = (PREVIEW_W * dpr) / base.w
-    if (finalSpec.kind === 'collage') renderCollageCard(canvas, finalSpec, ratio, covers, scale)
+    if (finalSpec.kind === 'collage') renderCollageCard(canvas, finalSpec, covers, scale)
     else renderShareCard(canvas, finalSpec, ratio, cover, scale)
     canvas.style.width = `${PREVIEW_W}px`
-    canvas.style.height = `${Math.round((PREVIEW_W * base.h) / base.w)}px`
+    // 拼贴卡画布尺寸随张数/评论自适应，按实际渲染尺寸回写（单卡走 SHARE_CARD_SIZES）
+    canvas.style.height = `${Math.round((PREVIEW_W * canvas.height) / canvas.width)}px`
   }, [finalSpec, cover, covers, ratio])
 
   // Esc 关闭
@@ -175,16 +176,15 @@ export function ShareCardModal() {
     if (!finalSpec || busy) return
     setBusy(true)
     try {
-      const blob = await exportShareCardBlob(finalSpec, ratio, cover, covers)
-      if (!blob) {
+      const result = await exportShareCardBlob(finalSpec, ratio, cover, covers)
+      if (!result) {
         useUiStore.getState().setToast('导出失败，请重试')
         return
       }
-      const url = URL.createObjectURL(blob)
+      const url = URL.createObjectURL(result.blob)
       const a = document.createElement('a')
       a.href = url
-      const { w, h } = SHARE_CARD_SIZES[ratio]
-      a.download = `CsPlayer - ${sanitizeFilename(finalSpec.title)} ${w}x${h}.jpg`
+      a.download = `CsPlayer - ${sanitizeFilename(finalSpec.title)} ${result.w}x${result.h}.jpg`
       a.click()
       URL.revokeObjectURL(url)
       useUiStore.getState().setToast('已导出分享卡片')
@@ -281,22 +281,25 @@ export function ShareCardModal() {
         </div>
 
         <div className="mt-3 flex items-center justify-between gap-3">
-          <div className="flex gap-1 rounded-full border border-neutral-800 bg-neutral-950/60 p-1">
-            {SHARE_CARD_RATIOS.map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRatio(r)}
-                className={`rounded-full px-3 py-1 text-xs transition-colors ${
-                  ratio === r
-                    ? 'bg-accent font-medium text-neutral-950'
-                    : 'text-neutral-400 hover:text-neutral-100'
-                }`}
-              >
-                {RATIO_LABEL[r]}
-              </button>
-            ))}
-          </div>
+          {/* 拼贴卡画布尺寸随张数自适应，不提供比例选择 */}
+          {source.kind !== 'collage' && (
+            <div className="flex gap-1 rounded-full border border-neutral-800 bg-neutral-950/60 p-1">
+              {SHARE_CARD_RATIOS.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRatio(r)}
+                  className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                    ratio === r
+                      ? 'bg-accent font-medium text-neutral-950'
+                      : 'text-neutral-400 hover:text-neutral-100'
+                  }`}
+                >
+                  {RATIO_LABEL[r]}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             type="button"
             disabled={!finalSpec || !coverDone || busy}

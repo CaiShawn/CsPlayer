@@ -133,6 +133,26 @@ function formatTotalDuration(ms: number): string {
 export const COLLAGE_MIN = 2
 export const COLLAGE_MAX = 9
 
+/** 拼贴网格行列：2→2 列、3–4→2 列、5–9→3 列（近正方画布） */
+export function collageGrid(count: number): { cols: number; rows: number } {
+  const cols = count <= 2 ? 2 : count <= 4 ? 2 : 3
+  return { cols, rows: Math.max(1, Math.ceil(count / cols)) }
+}
+
+/**
+ * 拼贴画布尺寸：随张数/评论自适应（宽 1080 基准），
+ * 高 = 上页边 + 网格 + 下页边（+ 评论预留）——每档张数都均匀填满，无死边。
+ */
+export function collageCanvasSize(count: number, commentLines: number): { w: number; h: number } {
+  const { cols, rows } = collageGrid(count)
+  const cell = (1080 - 2 * PAGE_PAD) / cols
+  const h =
+    PAGE_PAD +
+    rows * cell +
+    (commentLines > 0 ? 24 + commentLines * V_FONTS.commentLh + BOTTOM_PAD : PAGE_PAD)
+  return { w: 1080, h: Math.round(h) }
+}
+
 /** 拼贴卡 spec（S2）：标题/元信息固定文案，封面列表随选中顺序 */
 export function buildCollageSpec(albums: AlbumBrief[], accentHex: string): ShareCardSpec {
   return {
@@ -542,62 +562,46 @@ export function renderShareCard(
 }
 
 /**
- * 拼贴卡（S2）：满版封面网格（无徽标/标题/元信息），
+ * 拼贴卡（S2）：满版封面网格（无徽标/标题/元信息），画布尺寸随张数自适应（见 collageCanvasSize），
  * 评论引用体置底（同 S1），背景/色板/导出全部复用单卡链路。
  * covers：与 spec.collageCovers 对齐的像素图（失败项为 null → 占位）。
  */
 export function renderCollageCard(
   canvas: HTMLCanvasElement,
   spec: ShareCardSpec,
-  ratio: ShareCardRatio,
   covers: (HTMLImageElement | null)[],
   scale = 1,
 ): void {
-  const { w: W, h: H } = SHARE_CARD_SIZES[ratio]
-  canvas.width = Math.round(W * scale)
-  canvas.height = Math.round(H * scale)
   const ctx = canvas.getContext('2d')
   if (!ctx) return
+  const n = spec.collageCovers?.length ?? 0
+  // 先用真 ctx 量评论折行 → 定画布尺寸 → 再设 width/height（会重置 ctx 状态）并正式绘制
+  const maxTextW = 1080 - 2 * PAGE_PAD
+  const m = measureStack(ctx, spec, maxTextW, V_FONTS)
+  const { w: W, h: H } = collageCanvasSize(n, m.commentLines.length)
+  canvas.width = Math.round(W * scale)
+  canvas.height = Math.round(H * scale)
   ctx.setTransform(scale, 0, 0, scale, 0, 0)
   const rgb = hexToRgb(spec.accentHex)
-  const horizontal = W > H
-  const f = horizontal ? H_FONTS : V_FONTS
-  const pad = horizontal ? H_PAGE_PAD : PAGE_PAD
+  const pad = PAGE_PAD
 
   drawBackground(ctx, W, H, W / 2, H * 0.3, rgb, spec.bgStyle)
 
-  // 拼贴卡无文字元素（徽标/标题/元信息均无，spec.title 仅用于导出文件名），直接满版封面网格
-  const maxTextW = W - 2 * pad
-
-  // 底部评论区预留（同单卡）；剩余空间给封面网格
-  const m = measureStack(ctx, spec, maxTextW, f)
-  const commentZone = m.commentLines.length ? m.commentLines.length * f.commentLh + 24 : 0
-  const gridTop = pad
-  const gridBottom = H - BOTTOM_PAD - commentZone - (m.commentLines.length ? 0 : 24)
-
-  // 行列：横版 2→1×2、3–4→2×2、5–9→3×N；竖版 2→2×1（竖叠）、3–6→2×N、7–9→3×3
-  const n = spec.collageCovers?.length ?? 0
-  const cols = horizontal ? (n <= 4 ? 2 : 3) : n <= 2 ? 1 : n <= 6 ? 2 : 3
-  const rows = Math.ceil(Math.max(n, 1) / cols)
-  // 无缝平铺：无间隙、直角、无投影描边
-  const gap = 0
-  const availW = W - 2 * pad
-  const availH = Math.max(gridBottom - gridTop, 100)
-  const cell = Math.min((availW - (cols - 1) * gap) / cols, (availH - (rows - 1) * gap) / rows)
-  const gridW = cols * cell + (cols - 1) * gap
-  const gridH = rows * cell + (rows - 1) * gap
-  const gridX = pad + (availW - gridW) / 2
-  const gridY = gridTop + Math.max(0, (availH - gridH) / 2)
+  // 满版封面网格：cell 精确铺满宽度，末行不足时居中（画布高度已由 collageCanvasSize 按 rows 计入）
+  const { cols } = collageGrid(n)
+  const cell = (W - 2 * pad) / cols
   spec.collageCovers?.forEach((_, i) => {
-    const c = i % cols
     const r = Math.floor(i / cols)
-    drawCover(ctx, gridX + c * cell, gridY + r * cell, cell, covers[i] ?? null, rgb, {
+    const inRow = i - r * cols
+    const lastCount = Math.min(n - r * cols, cols)
+    const rowOffset = ((cols - lastCount) / 2) * cell // 末行居中
+    drawCover(ctx, pad + rowOffset + inRow * cell, pad + r * cell, cell, covers[i] ?? null, rgb, {
       round: 0,
       frame: false,
     })
   })
 
-  drawCommentBottom(ctx, spec, m, f, pad, H)
+  drawCommentBottom(ctx, spec, m, V_FONTS, pad, H)
 }
 
 /* ------------------------------------------------------------------------
@@ -606,16 +610,19 @@ export function renderCollageCard(
 
 /**
  * 离屏渲染 → JPEG Blob（scale=1 基准尺寸，画质 0.92）。
- * 统一导出 JPG（需求方定）；kind='collage' 走拼贴渲染（covers 对齐 spec.collageCovers）。
+ * 统一导出 JPG；返回实际尺寸供文件名使用（拼贴卡尺寸随张数自适应，不看 ratio）。
  */
 export async function exportShareCardBlob(
   spec: ShareCardSpec,
   ratio: ShareCardRatio,
   cover: HTMLImageElement | null,
   covers?: (HTMLImageElement | null)[],
-): Promise<Blob | null> {
+): Promise<{ blob: Blob; w: number; h: number } | null> {
   const canvas = document.createElement('canvas')
-  if (spec.kind === 'collage') renderCollageCard(canvas, spec, ratio, covers ?? [], 1)
+  if (spec.kind === 'collage') renderCollageCard(canvas, spec, covers ?? [], 1)
   else renderShareCard(canvas, spec, ratio, cover, 1)
-  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92))
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92),
+  )
+  return blob ? { blob, w: canvas.width, h: canvas.height } : null
 }
