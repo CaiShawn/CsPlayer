@@ -8,6 +8,7 @@ import { SongTable } from '../components/media/SongTable'
 import { useAuthStore } from '../stores/authStore'
 import { useLikesStore } from '../stores/likesStore'
 import { usePlayerStore } from '../stores/playerStore'
+import { useUiStore } from '../stores/uiStore'
 
 export function PlaylistPage() {
   const { id } = useParams()
@@ -71,6 +72,7 @@ export function PlaylistPage() {
         subtitle={`${detail.creatorName} · ${detail.trackCount} 首`}
         description={detail.description}
         onPlayAll={playAll}
+        onShare={() => useUiStore.getState().openShareCard({ kind: 'playlist', playlist: detail })}
       />
       <div className="mt-6">
         {detail.tracks.length === 0 ? (
@@ -158,6 +160,7 @@ export function AlbumPage() {
         subtitle={detail.artistName}
         description={detail.description}
         onPlayAll={playAll}
+        onShare={() => useUiStore.getState().openShareCard({ kind: 'album', album: detail })}
       />
       <div className="mt-6">
         {detail.tracks.length === 0 ? (
@@ -183,12 +186,15 @@ function DetailHeader({
   subtitle,
   description,
   onPlayAll,
+  onShare,
 }: {
   cover: string
   title: string
   subtitle: string
   description?: string
   onPlayAll: () => void
+  /** 可选：专辑 / 歌单页传「分享」（v0.1.8 S1）；不传则不出现按钮 */
+  onShare?: () => void
 }) {
   return (
     <div className="flex flex-col gap-6 sm:flex-row">
@@ -202,13 +208,24 @@ function DetailHeader({
             {description}
           </p>
         )}
-        <button
-          type="button"
-          onClick={onPlayAll}
-          className="mt-5 rounded-full bg-accent px-5 py-2 text-sm font-medium text-neutral-950 hover:bg-accent-hover"
-        >
-          ▶ 播放全部
-        </button>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={onPlayAll}
+            className="rounded-full bg-accent px-5 py-2 text-sm font-medium text-neutral-950 hover:bg-accent-hover"
+          >
+            ▶ 播放全部
+          </button>
+          {onShare && (
+            <button
+              type="button"
+              onClick={onShare}
+              className="rounded-full border border-neutral-700 bg-neutral-900 px-5 py-2 text-sm text-neutral-200 hover:border-accent/50 hover:text-accent-soft"
+            >
+              ◫ 分享
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
