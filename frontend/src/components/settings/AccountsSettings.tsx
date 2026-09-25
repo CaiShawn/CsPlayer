@@ -6,34 +6,48 @@ import {
   sortAccountsByRecent,
   type SavedAccount,
 } from '../../utils/cred'
-import { InfoButton } from './InfoModal'
 
-/** 存储卡内的小标题（账号凭证 / 本地数据）；extra 放 ⓘ 说明入口 */
-export function SubTitle({
-  children,
-  extra,
-}: {
-  children: ReactNode
-  extra?: ReactNode
-}) {
+/** 存储卡内的小标题（账号凭证 / 本地数据） */
+export function SubTitle({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-center gap-1.5 pb-1 text-sm font-medium text-neutral-200">
       {children}
-      {extra}
     </div>
   )
 }
 
-/** 「凭证说明」ⓘ 弹窗内容 */
-export function AccountsHelp() {
+/** 说明弹窗内的分节：加粗小标题 + 整段正文（不分行） */
+function HelpBlock({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div>
+      <div className="text-[15px] font-semibold text-neutral-200">{title}</div>
+      <div className="mt-1">{children}</div>
+    </div>
+  )
+}
+
+/** 「存储与清除说明」ⓘ 弹窗内容（凭证 + 本地数据统计 / 清除范围） */
+export function StorageHelp() {
   return (
     <>
-      <div>凭证保存在本机浏览器（localStorage），不上传后端；移除后需重新扫码。</div>
-      <div>
-        「清除本地数据」只清偏好与队列快照，
-        <span className="text-neutral-200">不影响这里的凭证</span>
-        ；凭证的清除入口只有右上「清除全部凭证」与「退出登录」。
-      </div>
+      <HelpBlock title="账号凭证">
+        <div>
+          凭证保存在本机浏览器（localStorage），不上传后端，移除后需重新扫码；凭证的清除入口只有「清除全部凭证」与「退出登录」，「清除本地数据」
+          <span className="text-neutral-200">不影响凭证</span>。
+        </div>
+      </HelpBlock>
+      <HelpBlock title="本地数据">
+        <div>
+          「清除本地数据」清偏好、背景图、最近记录、队列快照等全部本地数据；「恢复默认」仅重置偏好为默认值并清除背景图；占用
+          <span className="text-neutral-200">按分类精确统计</span>
+          ，构成见下方占用明细。
+        </div>
+      </HelpBlock>
+      <HelpBlock title="统计与同步">
+        <div>
+          封面缩略图走浏览器缓存，不计入统计也无法清除；所有数据仅存本机浏览器，不随账号同步，清浏览器数据或换设备后需重新配置。
+        </div>
+      </HelpBlock>
     </>
   )
 }
@@ -82,7 +96,7 @@ export function AccountsSettings() {
   const onClearAll = async () => {
     if (
       !window.confirm(
-        '将移除全部已保存账号的凭证：当前账号退出登录并吊销凭证，其余仅删除本机记录。不可恢复，继续？',
+        '将移除全部已保存账号的凭证：当前账号退出登录并吊销凭证，其余仅删除本机记录，下次需重新扫码。继续？',
       )
     )
       return
@@ -93,22 +107,13 @@ export function AccountsSettings() {
 
   return (
     <div className="mt-6 rounded-xl border border-neutral-800 bg-neutral-900/40 px-4 py-4 first:mt-0">
-      {/* 头部：标题 + ⓘ（左） / 清除全部凭证（右上） */}
+      {/* 头部：标题（左） / 清除全部凭证（右上）；说明入口已上移至「存储」标题右侧 */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <SubTitle
-          extra={
-            <InfoButton title="凭证说明" label="查看凭证保存与清除说明">
-              <AccountsHelp />
-            </InfoButton>
-          }
-        >
-          账号凭证
-        </SubTitle>
+        <SubTitle>账号凭证</SubTitle>
         <button
           type="button"
           onClick={() => void onClearAll()}
           disabled={rows.length === 0}
-          title="移除所有已保存账号（当前账号退出登录并吊销凭证），下次启动需重新扫码"
           className="rounded-full border border-red-500/40 bg-neutral-900 px-4 py-1.5 text-xs text-red-400 hover:border-red-400 hover:bg-red-500/10 disabled:opacity-50"
         >
           清除全部凭证

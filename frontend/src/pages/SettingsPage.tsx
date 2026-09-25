@@ -1,9 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { usePlayerStore } from '../stores/playerStore'
-import { useSettingsStore } from '../stores/settingsStore'
+import {
+  BACKGROUND_KEY,
+  CONTEXT_MENU_KEY,
+  LYRIC_COLLAPSED_KEY,
+  PREFS_BACKUP_KEY,
+  PREFS_KEY,
+  QUEUE_PIN_KEY,
+  QUEUE_SESSION_KEY,
+  VOLUME_KEY,
+  useSettingsStore,
+} from '../stores/settingsStore'
 import { ColorPicker } from '../components/settings/ColorPicker'
-import { AccountsSettings, SubTitle } from '../components/settings/AccountsSettings'
+import {
+  AccountsSettings,
+  StorageHelp,
+  SubTitle,
+} from '../components/settings/AccountsSettings'
 import { BackgroundSettings } from '../components/settings/BackgroundSettings'
 import { ContextMenuSettings } from '../components/settings/ContextMenuSettings'
 import { InfoButton } from '../components/settings/InfoModal'
@@ -20,16 +34,72 @@ const GROUPS = [
   { id: 'about', label: '关于' },
 ]
 
-function estimateStorageBytes(): number {
+/* 本地数据分类明细（方案 B：总量 + 构成摘要）。key 尽量取自 settingsStore 导出常量；
+   未导出的（最近播放 / 最近搜索 / 搜索页 tab）以字面量登记，改动 key 时需同步。 */
+const STORAGE_GROUPS: { id: string; label: string; keys: string[] }[] = [
+  { id: 'prefs', label: '偏好设置', keys: [PREFS_KEY, CONTEXT_MENU_KEY] },
+  { id: 'bg', label: '背景图', keys: [BACKGROUND_KEY] },
+  {
+    id: 'recent',
+    label: '最近记录',
+    keys: [
+      'csplayer:prefs:recentPlays',
+      'csplayer:prefs:recentAlbums',
+      'csplayer:prefs:recentPlaylists',
+      'csplayer:prefs:recentSearch',
+      'csplayer:searchTab',
+    ],
+  },
+  { id: 'queue', label: '队列快照', keys: [QUEUE_SESSION_KEY] },
+  {
+    id: 'state',
+    label: '音量与状态',
+    keys: [VOLUME_KEY, LYRIC_COLLAPSED_KEY, QUEUE_PIN_KEY],
+  },
+  { id: 'backup', label: '偏好备份', keys: [PREFS_BACKUP_KEY] },
+]
+
+/** 构成摘要的分组换行：内容类在上行，会话 / 状态类在下行 */
+const SUMMARY_CONTENT_IDS = new Set(['prefs', 'bg', 'recent'])
+
+/** 单个 key 的存储占用（key + value，UTF-16 × 2 字节）；两个 storage 都查 */
+function keyBytes(key: string): number {
   let bytes = 0
+  for (const storage of [localStorage, sessionStorage]) {
+    const v = storage.getItem(key)
+    if (v != null) bytes += (key.length + v.length) * 2
+  }
+  return bytes
+}
+
+/** 各分类占用（含未登记的 csplayer:* 残留，并入「其他」，保证与总量对得上） */
+function estimateStorage(): {
+  total: number
+  entries: { id: string; label: string; bytes: number }[]
+} {
+  const entries = STORAGE_GROUPS.map((g) => ({
+    id: g.id,
+    label: g.label,
+    bytes: g.keys.reduce((sum, k) => sum + keyBytes(k), 0),
+  }))
+  const known = new Set(STORAGE_GROUPS.flatMap((g) => g.keys))
+  let other = 0
   for (const storage of [localStorage, sessionStorage]) {
     for (let i = 0; i < storage.length; i++) {
       const k = storage.key(i)
-      if (!k || !k.startsWith('csplayer:')) continue
-      bytes += (k.length + (storage.getItem(k) || '').length) * 2 // UTF-16
+      if (!k || !k.startsWith('csplayer:') || known.has(k)) continue
+      other += (k.length + (storage.getItem(k) || '').length) * 2
     }
   }
-  return bytes
+  if (other > 0) entries.push({ id: 'other', label: '其他', bytes: other })
+  return { total: entries.reduce((s, e) => s + e.bytes, 0), entries }
+}
+
+/** 精确占用文案：B / KB / MB（去掉「约」，给确定值） */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`
 }
 
 export function SettingsPage() {
@@ -40,7 +110,7 @@ export function SettingsPage() {
   const resetPrefs = useSettingsStore((s) => s.resetPrefs)
   const clearLocalData = useSettingsStore((s) => s.clearLocalData)
   const queueLength = usePlayerStore((s) => s.queue.length)
-  const [usage, setUsage] = useState(() => estimateStorageBytes())
+  const [usage, setUsage] = useState(() => estimateStorage())
   const [activeId, setActiveId] = useState(GROUPS[0].id)
   const rootRef = useRef<HTMLDivElement>(null)
   const [searchParams] = useSearchParams()
@@ -72,11 +142,26 @@ export function SettingsPage() {
     return () => scroller.removeEventListener('scroll', onScroll)
   }, [])
 
-  const refreshUsage = () => setUsage(estimateStorageBytes())
-  const usageKb = (usage / 1024).toFixed(1)
+  const refreshUsage = () => setUsage(estimateStorage())
+  const usedEntries = usage.entries.filter((e) => e.bytes > 0)
+  const formatEntry = (e: (typeof usedEntries)[number]) =>
+    `${e.label} ${formatBytes(e.bytes)}${e.id === 'queue' ? `（${queueLength} 首）` : ''}`
+  // 摘要固定两行：偏好/背景/最近记录一行，队列/音量状态/备份一行
+  const summaryLines = [
+    usedEntries.filter((e) => SUMMARY_CONTENT_IDS.has(e.id)).map(formatEntry),
+    usedEntries.filter((e) => !SUMMARY_CONTENT_IDS.has(e.id)).map(formatEntry),
+  ]
+    .map((line) => line.join(' · '))
+    .filter(Boolean)
 
   const onClearLocalData = () => {
-    if (!window.confirm('将清除偏好设置、播放队列快照等全部本地数据，且不可恢复。继续？')) return
+    const items = usedEntries.map((e) => e.label).join('、') || '全部本地数据'
+    if (
+      !window.confirm(
+        `将清除：${items}（不含登录凭证）；当前播放队列同时清空，继续？`,
+      )
+    )
+      return
     clearLocalData()
     usePlayerStore.getState().clearQueue()
     refreshUsage()
@@ -234,7 +319,16 @@ export function SettingsPage() {
         <ContextMenuSettings />
 
         {/* 存储（v0.1.6 合并：账号凭证 + 本地数据，框中框结构同右键菜单） */}
-        <SettingSection id="storage" title="存储" desc="登录凭证与本地数据，均保存在本机浏览器">
+        <SettingSection
+          id="storage"
+          title="存储"
+          desc="登录凭证与本地数据，均保存在本机浏览器"
+          extra={
+            <InfoButton title="存储与清除说明" label="查看存储与清除说明">
+              <StorageHelp />
+            </InfoButton>
+          }
+        >
           <AccountsSettings />
 
           {/* 本地数据：右键菜单同款多行设置卡（文本块 + 按钮右对齐） */}
@@ -245,7 +339,6 @@ export function SettingsPage() {
               <button
                 type="button"
                 onClick={onClearLocalData}
-                title="偏好、队列快照等一次清空（不可恢复）；播放队列同时清空，不影响上方的登录凭证"
                 className="rounded-full border border-red-500/40 bg-neutral-900 px-4 py-1.5 text-xs text-red-400 hover:border-red-400 hover:bg-red-500/10"
               >
                 清除本地数据
@@ -254,11 +347,13 @@ export function SettingsPage() {
             <div className="mt-3 space-y-2">
               <div className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-950/40 px-3 py-2">
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm text-neutral-100">
-                    本地数据占用 · 约 {usageKb} KB（队列 {queueLength} 首）
-                  </div>
-                  <div className="mt-0.5 text-xs text-neutral-500">
-                    重新统计即时刷新；图片缓存由浏览器管理，无法精确统计
+                  <div className="text-sm text-neutral-100">本地数据占用 · {formatBytes(usage.total)}</div>
+                  <div className="mt-0.5 text-xs leading-5 text-neutral-500">
+                    {summaryLines.length ? (
+                      summaryLines.map((line) => <div key={line}>{line}</div>)
+                    ) : (
+                      <span>暂无本地数据</span>
+                    )}
                   </div>
                 </div>
                 <button
@@ -272,12 +367,18 @@ export function SettingsPage() {
               <div className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-950/40 px-3 py-2">
                 <div className="min-w-0 flex-1">
                   <div className="text-sm text-neutral-100">恢复默认</div>
-                  <div className="mt-0.5 text-xs text-neutral-500">仅重置全部偏好设置为默认值</div>
+                  <div className="mt-0.5 text-xs text-neutral-500">
+                    重置全部偏好设置为默认值，并清除背景图；最近记录、播放队列与登录凭证不动
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => {
-                    if (window.confirm('将全部偏好恢复为默认值，继续？')) {
+                    if (
+                      window.confirm(
+                        '将重置全部偏好设置为默认值并清除背景图；最近记录、播放队列与登录凭证不受影响。继续？',
+                      )
+                    ) {
                       resetPrefs()
                       refreshUsage()
                     }

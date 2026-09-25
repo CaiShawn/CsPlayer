@@ -1,20 +1,25 @@
 import type { ReactNode } from 'react'
 
-/** 设置分组（带锚点 id，供左侧分组锚点跳转） */
+/** 设置分组（带锚点 id，供左侧分组锚点跳转）；extra 放标题右侧（如 ⓘ 说明入口） */
 export function SettingSection({
   id,
   title,
   desc,
+  extra,
   children,
 }: {
   id: string
   title: string
   desc?: string
+  extra?: ReactNode
   children: ReactNode
 }) {
   return (
     <section id={id} className="scroll-mt-8">
-      <h2 className="text-lg font-semibold text-neutral-100">{title}</h2>
+      <div className="flex items-center gap-1.5">
+        <h2 className="text-lg font-semibold text-neutral-100">{title}</h2>
+        {extra}
+      </div>
       {desc && <p className="mt-1 text-xs text-neutral-500">{desc}</p>}
       <div className="mt-4 space-y-2">{children}</div>
     </section>
