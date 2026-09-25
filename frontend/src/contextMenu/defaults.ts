@@ -12,6 +12,7 @@ export const DEFAULT_CONTEXT_ORDER: Record<ContextKind, string[]> = {
     'addQueue',
     'like',
     'removeFromQueue',
+    'viewSource',
     'viewAlbum',
     'viewArtist',
     'copyLink',

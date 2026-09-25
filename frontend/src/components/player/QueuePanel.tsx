@@ -249,7 +249,7 @@ export function QueuePanel() {
           </div>
           {/* A2：队列来源标签 */}
           {queueSource && (
-            <div className="mt-0.5 truncate text-xs text-neutral-500">来自 {queueSource}</div>
+            <div className="mt-0.5 truncate text-xs text-neutral-500">来自 {queueSource.label}</div>
           )}
         </div>
         <div className="flex shrink-0 gap-2">

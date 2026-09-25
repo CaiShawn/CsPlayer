@@ -7,7 +7,7 @@ import { libraryApi } from '../api'
 import { useLikesStore } from '../stores/likesStore'
 import { usePlayerStore } from '../stores/playerStore'
 import { useUiStore } from '../stores/uiStore'
-import type { SongSummary } from '../types'
+import type { QueueSource, SongSummary } from '../types'
 import { copyText } from '../utils/clipboard'
 import type { ContextGroupPrefs, ContextKind, ContextTarget } from './types'
 
@@ -58,11 +58,13 @@ function artistIdOf(target: ContextTarget): number {
   return 0
 }
 
-/** 队列来源标签（A2）：播放队列面板标题下展示 */
-function sourceLabelOf(target: ContextTarget): string {
-  if (target.kind === 'album') return `专辑《${target.album.name}》`
-  if (target.kind === 'playlist') return `歌单《${target.playlist.name}》`
-  return '单曲'
+/** 队列来源（A2，S4 结构化）：播放队列面板标题下展示；专辑 / 歌单带 id 支持「查看来源」 */
+function sourceOf(target: ContextTarget): QueueSource {
+  if (target.kind === 'album')
+    return { label: `专辑《${target.album.name}》`, kind: 'album', id: target.album.id }
+  if (target.kind === 'playlist')
+    return { label: `歌单《${target.playlist.name}》`, kind: 'playlist', id: target.playlist.id }
+  return { label: '单曲' }
 }
 
 /** 目标对应的完整歌曲列表（专辑 / 歌单实时取详情，动作不新开服务层） */
@@ -122,7 +124,7 @@ export const CONTEXT_ACTIONS: ContextAction[] = [
           toast('没有可播放的歌曲')
           return
         }
-        player.playSongs(playable, start, sourceLabelOf(target))
+        player.playSongs(playable, start, sourceOf(target))
       } catch (e) {
         toast(e instanceof Error ? e.message : '播放失败')
       }
@@ -197,6 +199,26 @@ export const CONTEXT_ACTIONS: ContextAction[] = [
       if (target.kind === 'song' && target.queueIndex != null) {
         usePlayerStore.getState().removeFromQueue(target.queueIndex)
       }
+    },
+  },
+  {
+    id: 'viewSource',
+    name: '查看来源',
+    label: '查看来源',
+    icon: '↩',
+    kinds: ['song'],
+    queueOnly: true,
+    // 仅队列来源为可跳转对象（专辑 / 歌单详情页）时出现；近来听 / 搜索等纯标签来源不显示
+    when: () => {
+      const src = usePlayerStore.getState().queueSource
+      return !!src && src.kind != null && src.id != null
+    },
+    run: ({ navigate, close }) => {
+      const src = usePlayerStore.getState().queueSource
+      close()
+      if (!src || src.id == null) return
+      if (src.kind === 'playlist') navigate(`/playlist/${src.id}`)
+      else if (src.kind === 'album') navigate(`/album/${src.id}`)
     },
   },
   {

@@ -103,6 +103,16 @@ export interface AlbumDetail {
 
 export type PlayMode = 'order' | 'list-loop' | 'single' | 'shuffle'
 
+/**
+ * 队列来源（S4 结构化升级）：label 为面板展示文案（如 歌单《X》）；
+ * kind+id 具备时支持队列右键「查看来源」跳详情页。
+ */
+export interface QueueSource {
+  label: string
+  kind?: 'playlist' | 'album'
+  id?: number
+}
+
 export type QrStatus = 'waiting' | 'scanned' | 'success' | 'expired' | 'rate_limited'
 
 export interface LikedSongs {

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Lyric, PlayMode, QualityLevel, SongSummary } from '../types'
+import type { Lyric, PlayMode, QualityLevel, QueueSource, SongSummary } from '../types'
 import { findLyricIndex } from '../utils/lyric'
 import { pushRecentPlay } from '../utils/recentPlays'
 import {
@@ -41,8 +41,8 @@ interface PlayerState {
   /** 队列内容版本号：任何队列改写（换源/增删/排序）+1；
    *  topUpQueue 补全替换前校验，避免覆盖用户中途的队列操作 */
   queueEpoch: number
-  /** 队列来源标签（A2）：如「歌单《X》」，面板标题下展示；'' = 未知 */
-  queueSource: string
+  /** 队列来源（A2，S4 结构化）：面板标题下展示 label；kind+id 支持「查看来源」；null = 未知 */
+  queueSource: QueueSource | null
   playing: boolean
   playMode: PlayMode
   quality: QualityLevel
@@ -61,7 +61,7 @@ interface PlayerState {
   loadToken: number
 
   currentSong: () => SongSummary | null
-  playSongs: (list: SongSummary[], startIndex: number, source?: string) => void
+  playSongs: (list: SongSummary[], startIndex: number, source?: string | QueueSource) => void
   /** 「播放全部」后台补全：全量到位后原位扩展队列（epoch 未变才替换），
    *  保持当前曲/进度/播放状态不打断（不 bump loadToken） */
   topUpQueue: (list: SongSummary[], epoch: number) => void
@@ -199,8 +199,8 @@ interface QueueSession {
   quality: QualityLevel
   /** 刷新时刻的播放进度（秒），恢复后从该位置继续 */
   currentTime: number
-  /** 队列来源标签（A2），刷新恢复后仍显示 */
-  source: string
+  /** 队列来源标签（A2），刷新恢复后仍显示；兼容旧版纯字符串 session */
+  source: string | QueueSource | null
 }
 
 function readQueueSession(): QueueSession | null {
@@ -226,11 +226,20 @@ function readQueueSession(): QueueSession | null {
       currentIndex,
       quality,
       currentTime,
-      source: typeof parsed.source === 'string' ? parsed.source : '',
+      source: normalizeQueueSource(parsed.source),
     }
   } catch {
     return null
   }
+}
+
+/** 队列来源归一：旧 session 字符串包成 {label}；非法形状回 null */
+function normalizeQueueSource(raw: unknown): QueueSource | null {
+  if (typeof raw === 'string') return raw ? { label: raw } : null
+  const t = raw as QueueSource | null
+  if (!t || typeof t.label !== 'string') return null
+  const kind = t.kind === 'playlist' || t.kind === 'album' ? t.kind : undefined
+  return { label: t.label, kind, id: typeof t.id === 'number' ? t.id : undefined }
 }
 
 function writeQueueSession(): void {
@@ -262,7 +271,7 @@ const queueSession = readQueueSession()
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
   queue: queueSession?.queue ?? [],
-  queueSource: queueSession?.source ?? '',
+  queueSource: normalizeQueueSource(queueSession?.source),
   currentIndex: queueSession?.currentIndex ?? -1,
   queueEpoch: 0,
   // 「刷新后自动播放」开启且有恢复队列时：刷新即自动继续播放（从原进度）
@@ -292,7 +301,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const idx = Math.max(0, Math.min(startIndex, tracks.length - 1))
     set({
       queue: tracks,
-      queueSource: source ?? '',
+      queueSource: normalizeQueueSource(source ?? null),
       currentIndex: tracks.length ? idx : -1,
       queueEpoch: get().queueEpoch + 1,
       playing: tracks.length > 0,
@@ -364,7 +373,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   togglePlay: () => {
     const { currentIndex, queue, playing } = get()
     if (currentIndex < 0 && queue.length) {
-      get().playSongs(queue, 0, get().queueSource)
+      get().playSongs(queue, 0, get().queueSource ?? undefined)
       return
     }
     set({ playing: !playing })
@@ -488,7 +497,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   clearQueue: () =>
     set((s) => ({
       queue: [],
-      queueSource: '',
+      queueSource: null,
       currentIndex: -1,
       queueEpoch: s.queueEpoch + 1,
       playing: false,

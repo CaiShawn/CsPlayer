@@ -62,7 +62,11 @@ export function PlaylistPage() {
       creatorName: detail.creatorName,
       subscribed: detail.subscribed,
     })
-    usePlayerStore.getState().playSongs(playable, 0, `歌单《${detail.name}》`)
+    usePlayerStore.getState().playSongs(playable, 0, {
+      label: `歌单《${detail.name}》`,
+      kind: 'playlist',
+      id: detail.id,
+    })
   }
 
   const onPlay = (index: number) => {
@@ -78,7 +82,11 @@ export function PlaylistPage() {
       creatorName: detail.creatorName,
       subscribed: detail.subscribed,
     })
-    usePlayerStore.getState().playSongs(playable, Math.max(0, start), `歌单《${detail.name}》`)
+    usePlayerStore.getState().playSongs(playable, Math.max(0, start), {
+      label: `歌单《${detail.name}》`,
+      kind: 'playlist',
+      id: detail.id,
+    })
   }
 
   return (
@@ -166,7 +174,11 @@ export function AlbumPage() {
       artistId: detail.artistId,
       artistName: detail.artistName,
     })
-    usePlayerStore.getState().playSongs(playable, 0, `专辑《${detail.name}》`)
+    usePlayerStore.getState().playSongs(playable, 0, {
+      label: `专辑《${detail.name}》`,
+      kind: 'album',
+      id: detail.id,
+    })
   }
 
   const onPlay = (index: number) => {
@@ -181,7 +193,11 @@ export function AlbumPage() {
       artistId: detail.artistId,
       artistName: detail.artistName,
     })
-    usePlayerStore.getState().playSongs(playable, Math.max(0, start), `专辑《${detail.name}》`)
+    usePlayerStore.getState().playSongs(playable, Math.max(0, start), {
+      label: `专辑《${detail.name}》`,
+      kind: 'album',
+      id: detail.id,
+    })
   }
 
   return (
