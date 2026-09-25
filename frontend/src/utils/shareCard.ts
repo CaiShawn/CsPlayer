@@ -48,6 +48,8 @@ export interface ShareCardSpec {
   bgStyle?: 'gradient' | 'solid'
   /** 拼贴卡（kind='collage'）：参与拼贴的封面 URL 列表 */
   collageCovers?: string[]
+  /** 拼贴卡取向：竖（默认，行 ≥ 列）/ 横（列 ≥ 行） */
+  orientation?: 'portrait' | 'landscape'
 }
 
 /** 导出基准像素（竖版 1080 宽、横版 1080 高） */
@@ -133,9 +135,16 @@ function formatTotalDuration(ms: number): string {
 export const COLLAGE_MIN = 2
 export const COLLAGE_MAX = 20
 
-/** 拼贴网格行列：2→2 列、3–4→2 列、5–9→3 列、10–20→4 列（20=4×5 正好铺满） */
-export function collageGrid(count: number): { cols: number; rows: number } {
-  const cols = count <= 2 ? 2 : count <= 4 ? 2 : count <= 9 ? 3 : 4
+/**
+ * 拼贴网格行列：按取向选列数——竖取 round(√N)（行 ≥ 列），横取 ceil(√N)（列 ≥ 行）；
+ * 完全平方数（4/9/16…）两取向同网格，切换无变化。
+ */
+export function collageGrid(
+  count: number,
+  orientation: 'portrait' | 'landscape' = 'portrait',
+): { cols: number; rows: number } {
+  const s = Math.sqrt(Math.max(count, 1))
+  const cols = orientation === 'portrait' ? Math.max(1, Math.round(s)) : Math.max(1, Math.ceil(s))
   return { cols, rows: Math.max(1, Math.ceil(count / cols)) }
 }
 
@@ -143,8 +152,12 @@ export function collageGrid(count: number): { cols: number; rows: number } {
  * 拼贴画布尺寸：随张数/评论自适应（宽 1080 基准），
  * 高 = 上页边 + 网格 + 下页边（+ 评论预留）——每档张数都均匀填满，无死边。
  */
-export function collageCanvasSize(count: number, commentLines: number): { w: number; h: number } {
-  const { cols, rows } = collageGrid(count)
+export function collageCanvasSize(
+  count: number,
+  commentLines: number,
+  orientation: 'portrait' | 'landscape' = 'portrait',
+): { w: number; h: number } {
+  const { cols, rows } = collageGrid(count, orientation)
   const cell = (1080 - 2 * PAGE_PAD) / cols
   const h =
     PAGE_PAD +
@@ -575,10 +588,11 @@ export function renderCollageCard(
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   const n = spec.collageCovers?.length ?? 0
+  const orientation = spec.orientation ?? 'portrait'
   // 先用真 ctx 量评论折行 → 定画布尺寸 → 再设 width/height（会重置 ctx 状态）并正式绘制
   const maxTextW = 1080 - 2 * PAGE_PAD
   const m = measureStack(ctx, spec, maxTextW, V_FONTS)
-  const { w: W, h: H } = collageCanvasSize(n, m.commentLines.length)
+  const { w: W, h: H } = collageCanvasSize(n, m.commentLines.length, orientation)
   canvas.width = Math.round(W * scale)
   canvas.height = Math.round(H * scale)
   ctx.setTransform(scale, 0, 0, scale, 0, 0)
@@ -588,7 +602,7 @@ export function renderCollageCard(
   drawBackground(ctx, W, H, W / 2, H * 0.3, rgb, spec.bgStyle)
 
   // 满版封面网格：cell 精确铺满宽度，末行不足时居中（画布高度已由 collageCanvasSize 按 rows 计入）
-  const { cols } = collageGrid(n)
+  const { cols } = collageGrid(n, orientation)
   const cell = (W - 2 * pad) / cols
   spec.collageCovers?.forEach((_, i) => {
     const r = Math.floor(i / cols)
