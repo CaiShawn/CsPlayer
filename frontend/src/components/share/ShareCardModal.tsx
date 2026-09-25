@@ -53,7 +53,6 @@ export function ShareCardModal() {
   const [comment, setComment] = useState('') // 个人评论（可选，实时预览）
   const [accent, setAccent] = useState('#10b981') // 主题色（弹窗内可切换，切换对象时重置回主题）
   const [bgMode, setBgMode] = useState<'gradient' | 'solid'>('gradient') // 背景样式
-  const [showBadge, setShowBadge] = useState(true) // 拼贴卡徽标「唱片架」
   const [cover, setCover] = useState<HTMLImageElement | null>(null)
   const [covers, setCovers] = useState<(HTMLImageElement | null)[]>([]) // 拼贴卡多封面（与 collageCovers 对齐）
   const [coverDone, setCoverDone] = useState(false) // 封面加载已完结（成功或失败）
@@ -68,19 +67,13 @@ export function ShareCardModal() {
     return list.includes(theme) ? list : [theme, ...list]
   }, [])
 
-  // 最终 spec：叠加评论 / 弹窗内选的主题色 / 背景样式 / 拼贴徽标开关
+  // 最终 spec：叠加评论 / 弹窗内选的主题色 / 背景样式
   const finalSpec = useMemo(
     () =>
       spec
-        ? {
-            ...spec,
-            comment: comment.trim() || undefined,
-            accentHex: accent,
-            bgStyle: bgMode,
-            ...(spec.kind === 'collage' ? { showBadge } : {}),
-          }
+        ? { ...spec, comment: comment.trim() || undefined, accentHex: accent, bgStyle: bgMode }
         : null,
-    [spec, comment, accent, bgMode, showBadge],
+    [spec, comment, accent, bgMode],
   )
 
   // 入参 → spec（专辑 Brief 缺曲目数时补拉一次详情，服务端缓存 300s）
@@ -250,46 +243,23 @@ export function ShareCardModal() {
           </span>
         </div>
 
-        {/* 背景样式 + 徽标开关（拼贴卡） + 主题色（弹窗内临时切换，不影响应用设置） */}
+        {/* 背景样式 + 主题色（弹窗内临时切换，不影响应用设置） */}
         <div className="mt-3 flex items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-1">
-            <div className="flex gap-1 rounded-full border border-neutral-800 bg-neutral-950/60 p-1">
-              {(['gradient', 'solid'] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setBgMode(m)}
-                  className={`rounded-full px-3 py-1 text-xs transition-colors ${
-                    bgMode === m
-                      ? 'bg-accent font-medium text-neutral-950'
-                      : 'text-neutral-400 hover:text-neutral-100'
-                  }`}
-                >
-                  {m === 'gradient' ? '渐变' : '纯色'}
-                </button>
-              ))}
-            </div>
-            {source.kind === 'collage' && (
-              <div className="flex gap-1 rounded-full border border-neutral-800 bg-neutral-950/60 p-1">
-                {([
-                  [true, '徽标'],
-                  [false, '无徽标'],
-                ] as const).map(([v, label]) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => setShowBadge(v)}
-                    className={`rounded-full px-3 py-1 text-xs transition-colors ${
-                      showBadge === v
-                        ? 'bg-accent font-medium text-neutral-950'
-                        : 'text-neutral-400 hover:text-neutral-100'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="flex gap-1 rounded-full border border-neutral-800 bg-neutral-950/60 p-1">
+            {(['gradient', 'solid'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setBgMode(m)}
+                className={`rounded-full px-3 py-1 text-xs transition-colors ${
+                  bgMode === m
+                    ? 'bg-accent font-medium text-neutral-950'
+                    : 'text-neutral-400 hover:text-neutral-100'
+                }`}
+              >
+                {m === 'gradient' ? '渐变' : '纯色'}
+              </button>
+            ))}
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1.5">
             {swatches.map((hex) => (
