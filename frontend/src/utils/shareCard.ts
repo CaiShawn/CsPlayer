@@ -136,6 +136,7 @@ const PAGE_PAD = 72 // 竖版页边
 const H_PAGE_PAD = 88 // 横版页边
 const COVER_GAP = 56 // 竖版封面-文字间距
 const H_TEXT_GAP = 72 // 横版封面-文案列间距
+const BOTTOM_PAD = 44 // 底部评论块距底边（原落款行位置）
 
 /** 字号体系：竖 / 横两套（font 字符串不含字体栈） */
 interface Fonts {
@@ -262,16 +263,14 @@ function measureStack(ctx: CanvasRenderingContext2D, spec: ShareCardSpec, maxW: 
   return { titleLines, commentLines }
 }
 
-/** 文本栈总高（徽标 + 标题 + 副题 + 元信息 + 评论置底?） */
-function stackHeight(f: Fonts, titleLines: number, commentLines: number): number {
-  let h = 44 + 36 + titleLines * f.titleLh + 22 + f.subtitleLh + 18 + 36
-  if (commentLines > 0) h += 20 + commentLines * f.commentLh
-  return h
+/** 文本栈总高（徽标 + 标题 + 副题 + 元信息；评论不在栈内，固定在卡片底部） */
+function stackHeight(f: Fonts, titleLines: number): number {
+  return 44 + 36 + titleLines * f.titleLh + 22 + f.subtitleLh + 18 + 36
 }
 
 /**
- * 文本栈绘制（徽标 → 标题 → 副题 → 元信息 → 评论置底?），返回实际占用高度。
- * 元信息前置 accent 分隔点；评论为引用体：accent 竖线 + 浅色文字，位于文本栈最后一位。
+ * 文本栈绘制（徽标 → 标题 → 副题 → 元信息），返回实际占用高度。
+ * 元信息前置 accent 分隔点。
  */
 function drawStack(
   ctx: CanvasRenderingContext2D,
@@ -321,22 +320,33 @@ function drawStack(
   ctx.fillText(ellipsize(ctx, spec.meta, maxW - 18), x + 18, y + 26)
   y += 36
 
-  // 个人评论（引用体：accent 竖线 + 浅色文字，置底）
-  if (m.commentLines.length) {
-    y += 20
-    const barH = m.commentLines.length * f.commentLh - 8
-    roundRectPath(ctx, x, y, 5, barH, 2.5)
-    ctx.fillStyle = spec.accentHex
-    ctx.fill()
-    ctx.font = `${f.comment} ${FONT_STACK}`
-    ctx.fillStyle = '#e5e5e5'
-    m.commentLines.forEach((line, i) => {
-      ctx.fillText(line, x + 20, y + f.commentLh * i + pxOf(f.comment))
-    })
-    y += m.commentLines.length * f.commentLh
-  }
-
   return y - start
+}
+
+/**
+ * 个人评论（引用体：accent 竖线 + 浅色文字），固定渲染在卡片底部原落款行位置。
+ * 末行贴底边距、向上生长；竖版 / 横版同位（左下）。
+ */
+function drawCommentBottom(
+  ctx: CanvasRenderingContext2D,
+  spec: ShareCardSpec,
+  m: { commentLines: string[] },
+  f: Fonts,
+  pad: number,
+  H: number,
+): void {
+  const lines = m.commentLines
+  if (!lines.length) return
+  const blockH = lines.length * f.commentLh
+  const blockTop = H - BOTTOM_PAD - blockH
+  roundRectPath(ctx, pad, blockTop, 5, blockH - 8, 2.5)
+  ctx.fillStyle = spec.accentHex
+  ctx.fill()
+  ctx.font = `${f.comment} ${FONT_STACK}`
+  ctx.fillStyle = '#e5e5e5'
+  lines.forEach((line, i) => {
+    ctx.fillText(line, pad + 20, blockTop + f.commentLh * i + pxOf(f.comment))
+  })
 }
 
 /** 海报底：对角线性渐变 + accent 双径向（封面中心 + 右下角极淡） */
@@ -410,6 +420,7 @@ function drawCover(ctx: CanvasRenderingContext2D, x: number, y: number, size: nu
  * scale：1 = 导出原始尺寸；预览传（显示宽 × dpr）/ 版式宽。
  * 竖版（h ≥ w）：单栏，封面在上、文案在下，内容块垂直居中；
  * 横版（w > h）：双栏，封面左、文案右垂直居中，共用同一文本栈。
+ * 个人评论（可选）固定渲染在底部原落款行位置（两种版式同位）。
  */
 export function renderShareCard(
   canvas: HTMLCanvasElement,
@@ -427,6 +438,7 @@ export function renderShareCard(
   const rgb = hexToRgb(spec.accentHex)
   const horizontal = W > H
   const f = horizontal ? H_FONTS : V_FONTS
+  const pad = horizontal ? H_PAGE_PAD : PAGE_PAD
 
   let coverX: number
   let coverY: number
@@ -436,38 +448,44 @@ export function renderShareCard(
   let maxTextW: number
 
   if (horizontal) {
-    // 双栏：封面占高（扣除页边）且不超过版面宽 40%，文案列垂直居中
-    coverSize = Math.min(H - 2 * H_PAGE_PAD, Math.round(W * 0.4))
-    coverX = H_PAGE_PAD
-    coverY = Math.round((H - coverSize) / 2)
-    textX = H_PAGE_PAD + coverSize + H_TEXT_GAP
+    // 双栏：先量文本栈定文案列宽度，再定封面尺寸（扣除页边与底部评论区）
+    textX = H_PAGE_PAD + Math.round(W * 0.4) + H_TEXT_GAP
     maxTextW = W - textX - H_PAGE_PAD
     const m = measureStack(ctx, spec, maxTextW, f)
-    const sh = stackHeight(f, m.titleLines.length, m.commentLines.length)
+    const zone = m.commentLines.length ? m.commentLines.length * f.commentLh + 24 : 0
+    const availSpan = H - 2 * H_PAGE_PAD - zone
+    coverSize = Math.min(availSpan, Math.round(W * 0.4))
+    coverX = H_PAGE_PAD
+    coverY = H_PAGE_PAD + Math.round((availSpan - coverSize) / 2)
+    textX = H_PAGE_PAD + coverSize + H_TEXT_GAP
+    const sh = stackHeight(f, m.titleLines.length)
     textTop = coverY + Math.max(0, Math.round((coverSize - sh) / 2))
     drawBackground(ctx, W, H, coverX + coverSize / 2, coverY + coverSize / 2, rgb)
     drawCover(ctx, coverX, coverY, coverSize, cover, rgb)
     drawStack(ctx, spec, textX, textTop, maxTextW, f, m)
+    drawCommentBottom(ctx, spec, m, f, pad, H)
   } else {
-    // 单栏：封面先按上限，再按「最坏 2 行标题 + 评论 + 页边」逐档收缩
+    // 单栏：封面先按上限，再按「最坏 2 行标题 + 页边 + 底部评论区」逐档收缩
     maxTextW = W - 2 * PAGE_PAD
     const m = measureStack(ctx, spec, maxTextW, f)
-    const maxContentH = H - 2 * PAGE_PAD
+    const zone = m.commentLines.length ? m.commentLines.length * f.commentLh + 24 : 0
+    const maxContentH = H - 2 * PAGE_PAD - zone
     coverSize = Math.min(W - 2 * PAGE_PAD, Math.round(H * 0.55))
     while (
-      coverSize + COVER_GAP + stackHeight(f, f.titleMax, m.commentLines.length) > maxContentH &&
+      coverSize + COVER_GAP + stackHeight(f, f.titleMax) > maxContentH &&
       coverSize > W * 0.38
     ) {
       coverSize -= 8
     }
-    const blockH = coverSize + COVER_GAP + stackHeight(f, m.titleLines.length, m.commentLines.length)
+    const blockH = coverSize + COVER_GAP + stackHeight(f, m.titleLines.length)
     coverX = Math.round((W - coverSize) / 2)
-    coverY = Math.max(PAGE_PAD, Math.round((H - blockH) / 2))
+    coverY = PAGE_PAD + Math.max(0, Math.round((maxContentH - blockH) / 2))
     textX = PAGE_PAD
     textTop = coverY + coverSize + COVER_GAP
     drawBackground(ctx, W, H, W / 2, coverY + coverSize * 0.35, rgb)
     drawCover(ctx, coverX, coverY, coverSize, cover, rgb)
     drawStack(ctx, spec, textX, textTop, maxTextW, f, m)
+    drawCommentBottom(ctx, spec, m, f, pad, H)
   }
 }
 
