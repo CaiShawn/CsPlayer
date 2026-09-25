@@ -29,7 +29,11 @@ const RATIO_LABEL: Record<ShareCardRatio, string> = {
   '1:1': '1:1',
   '3:4': '3:4',
   '9:16': '9:16',
+  '4:3': '4:3',
+  '16:9': '16:9',
 }
+
+const COMMENT_MAX = 48 // 个人评论限长（设计 §1.10）
 
 /** 当前主题 accent 的 hex（预设名 → 预设色；自定义 → 规范化 hex） */
 function currentAccentHex(): string {
@@ -44,6 +48,7 @@ export function ShareCardModal() {
 
   const [ratio, setRatio] = useState<ShareCardRatio>('3:4')
   const [spec, setSpec] = useState<ShareCardSpec | null>(null)
+  const [comment, setComment] = useState('') // 个人评论（可选，实时预览）
   const [cover, setCover] = useState<HTMLImageElement | null>(null)
   const [coverDone, setCoverDone] = useState(false) // 封面加载已完结（成功或失败）
   const [failed, setFailed] = useState(false)
@@ -52,10 +57,17 @@ export function ShareCardModal() {
 
   const accentHex = useMemo(currentAccentHex, [source]) // 打开瞬间取色；弹窗内主题不会变
 
+  // 最终 spec：叠加个人评论（空 = undefined，不占位）；评论输入不触发封面重载
+  const finalSpec = useMemo(
+    () => (spec ? { ...spec, comment: comment.trim() || undefined } : null),
+    [spec, comment],
+  )
+
   // 入参 → spec（专辑 Brief 缺曲目数时补拉一次详情，服务端缓存 300s）
   useEffect(() => {
     if (!source) return
     setSpec(null)
+    setComment('')
     setCover(null)
     setCoverDone(false)
     setFailed(false)
@@ -97,16 +109,17 @@ export function ShareCardModal() {
     }
   }, [spec?.coverUrl])
 
-  // 预览绘制（dpr 适配防锯齿；spec/封面/比例任一变化即重绘）
+  // 预览绘制（dpr 适配防锯齿，缩放基准为版式宽；spec/封面/比例任一变化即重绘）
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas || !spec) return
+    if (!canvas || !finalSpec) return
     const dpr = Math.min(window.devicePixelRatio || 1, 3)
-    const scale = (PREVIEW_W * dpr) / 1080
-    renderShareCard(canvas, spec, ratio, cover, scale)
+    const base = SHARE_CARD_SIZES[ratio]
+    const scale = (PREVIEW_W * dpr) / base.w
+    renderShareCard(canvas, finalSpec, ratio, cover, scale)
     canvas.style.width = `${PREVIEW_W}px`
-    canvas.style.height = `${Math.round((PREVIEW_W * SHARE_CARD_SIZES[ratio].h) / 1080)}px`
-  }, [spec, cover, ratio])
+    canvas.style.height = `${Math.round((PREVIEW_W * base.h) / base.w)}px`
+  }, [finalSpec, cover, ratio])
 
   // Esc 关闭
   useEffect(() => {
@@ -121,10 +134,10 @@ export function ShareCardModal() {
   if (!source) return null
 
   const onDownload = async () => {
-    if (!spec || busy) return
+    if (!finalSpec || busy) return
     setBusy(true)
     try {
-      const blob = await exportShareCardPng(spec, ratio, cover)
+      const blob = await exportShareCardPng(finalSpec, ratio, cover)
       if (!blob) {
         useUiStore.getState().setToast('导出失败，请重试')
         return
@@ -132,7 +145,7 @@ export function ShareCardModal() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `CsPlayer - ${sanitizeFilename(spec.title)}.png`
+      a.download = `CsPlayer - ${sanitizeFilename(finalSpec.title)}.png`
       a.click()
       URL.revokeObjectURL(url)
       useUiStore.getState().setToast('已导出分享卡片')
@@ -165,14 +178,29 @@ export function ShareCardModal() {
         <div className="mt-4 flex min-h-0 flex-1 items-center justify-center overflow-y-auto rounded-xl bg-neutral-950/60 py-4">
           {failed ? (
             <div className="px-6 text-center text-sm text-neutral-400">卡片数据准备失败，请关闭后重试</div>
-          ) : !spec || !coverDone ? (
+          ) : !finalSpec || !coverDone ? (
             <Loading text="" />
           ) : (
             <canvas ref={canvasRef} className="rounded-lg shadow-lg" aria-label="分享卡片预览" />
           )}
         </div>
 
-        <div className="mt-4 flex items-center justify-between gap-3">
+        {/* 个人评论（可选）：实时预览，留空不占位 */}
+        <div className="relative mt-3">
+          <input
+            type="text"
+            value={comment}
+            maxLength={COMMENT_MAX}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="写点想说的，留在卡片上（可选）"
+            className="w-full rounded-xl border border-neutral-800 bg-neutral-950/60 px-3 py-2 pr-12 text-sm text-neutral-100 placeholder:text-neutral-600 focus:border-accent/50 focus:outline-none"
+          />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-neutral-600">
+            {comment.length}/{COMMENT_MAX}
+          </span>
+        </div>
+
+        <div className="mt-3 flex items-center justify-between gap-3">
           <div className="flex gap-1 rounded-full border border-neutral-800 bg-neutral-950/60 p-1">
             {SHARE_CARD_RATIOS.map((r) => (
               <button
@@ -191,7 +219,7 @@ export function ShareCardModal() {
           </div>
           <button
             type="button"
-            disabled={!spec || !coverDone || busy}
+            disabled={!finalSpec || !coverDone || busy}
             onClick={() => void onDownload()}
             className="rounded-full bg-accent px-5 py-2 text-sm font-medium text-neutral-950 hover:bg-accent-hover disabled:opacity-40"
           >
