@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { Link } from 'react-router-dom'
 import type { AlbumBrief, PlaylistBrief, SongSummary } from '../types'
 import { Cover } from '../components/common/Cover'
@@ -18,12 +18,22 @@ import {
 } from '../utils/recentPlays'
 
 /* ---------------------------------------------------------------------------
- * 近来听（/recent，设计 S4）：最近播放的本地记录提为独立路由
+ * 最近播放（/recent，侧栏「近来听」，设计 S4）：本地记录提为独立路由
  *   单曲 50 首（点击续播、右键沿用歌曲菜单）/ 专辑 10 张 / 歌单 10 张（点击进详情）；
- *   仅保存在本机浏览器、可分区清空（useSyncExternalStore 订阅即时刷新）。
+ *   三栏 Tab 切换（同 SearchPage 体例），每栏独立「清空」；
+ *   仅保存在本机浏览器（useSyncExternalStore 订阅即时刷新）。
  * ------------------------------------------------------------------------ */
 
+type RecentTab = 'song' | 'album' | 'playlist'
+
+const TABS: { id: RecentTab; label: string; hint: string }[] = [
+  { id: 'song', label: '单曲', hint: '最多 50 首' },
+  { id: 'album', label: '专辑', hint: '最多 10 张' },
+  { id: 'playlist', label: '歌单', hint: '最多 10 张' },
+]
+
 export function RecentPage() {
+  const [tab, setTab] = useState<RecentTab>('song')
   const songs = useSyncExternalStore(subscribeRecentPlays, loadRecentPlays)
   const albums = useSyncExternalStore(subscribeRecentAlbums, loadRecentAlbums)
   const playlists = useSyncExternalStore(subscribeRecentPlaylists, loadRecentPlaylists)
@@ -33,22 +43,68 @@ export function RecentPage() {
     const song = songs[index]
     if (!song?.playable) return
     const start = playable.findIndex((t) => t.id === song.id)
-    usePlayerStore.getState().playSongs(playable, Math.max(0, start), '近来听')
+    usePlayerStore.getState().playSongs(playable, Math.max(0, start), '最近播放')
   }
+
+  const counts: Record<RecentTab, number> = {
+    song: songs.length,
+    album: albums.length,
+    playlist: playlists.length,
+  }
+  const clears: Record<RecentTab, (() => void) | undefined> = {
+    song: songs.length ? clearRecentPlays : undefined,
+    album: albums.length ? clearRecentAlbums : undefined,
+    playlist: playlists.length ? clearRecentPlaylists : undefined,
+  }
+  const active = TABS.find((t) => t.id === tab)!
 
   return (
     <div className="p-8 pb-28">
-      <h1 className="text-2xl font-bold text-neutral-50">近来听</h1>
-      <p className="mt-1 text-xs text-neutral-500">只保存在本机浏览器，不上传</p>
+      <h1 className="text-2xl font-bold text-neutral-50">最近播放</h1>
 
-      {/* 单曲（50） */}
-      <Section
-        title="单曲"
-        hint="最近播放 · 最多 50 首"
-        count={songs.length}
-        onClear={songs.length ? clearRecentPlays : undefined}
-        empty="还没有播放记录，听过的歌会出现在这里"
-      >
+      {/* Tab 行（SearchPage 体例）+ 右侧提示 / 清空 */}
+      <div className="mt-4 flex items-end justify-between border-b border-neutral-800">
+        <div className="flex">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={`-mb-px border-b-2 px-4 py-2 text-sm transition-colors ${
+                tab === t.id
+                  ? 'border-accent text-accent-soft'
+                  : 'border-transparent text-neutral-400 hover:text-neutral-100'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3 pb-2">
+          <span className="text-xs text-neutral-500">{active.hint}</span>
+          {clears[tab] && (
+            <button
+              type="button"
+              onClick={clears[tab]}
+              className="text-xs text-neutral-500 hover:text-neutral-200"
+            >
+              清空
+            </button>
+          )}
+        </div>
+      </div>
+
+      {counts[tab] === 0 ? (
+        <EmptyBox
+          text={
+            tab === 'song'
+              ? '还没有播放记录，听过的歌会出现在这里'
+              : tab === 'album'
+                ? '还没有专辑播放记录'
+                : '还没有歌单播放记录'
+          }
+        />
+      ) : tab === 'song' ? (
         <div className="mt-4 overflow-hidden rounded-xl border border-neutral-800">
           {songs.map((song: SongSummary, index) => (
             <button
@@ -80,16 +136,7 @@ export function RecentPage() {
             </button>
           ))}
         </div>
-      </Section>
-
-      {/* 专辑（10） */}
-      <Section
-        title="专辑"
-        hint="最近播放 · 最多 10 张"
-        count={albums.length}
-        onClear={albums.length ? clearRecentAlbums : undefined}
-        empty="还没有专辑播放记录"
-      >
+      ) : tab === 'album' ? (
         <div className="mt-4 grid grid-cols-2 gap-[var(--space-card-gap)] sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
           {albums.map((a: AlbumBrief) => (
             <Link
@@ -106,16 +153,7 @@ export function RecentPage() {
             </Link>
           ))}
         </div>
-      </Section>
-
-      {/* 歌单（10） */}
-      <Section
-        title="歌单"
-        hint="最近播放 · 最多 10 张"
-        count={playlists.length}
-        onClear={playlists.length ? clearRecentPlaylists : undefined}
-        empty="还没有歌单播放记录"
-      >
+      ) : (
         <div className="mt-4 grid grid-cols-2 gap-[var(--space-card-gap)] sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
           {playlists.map((p: PlaylistBrief) => (
             <Link
@@ -137,50 +175,16 @@ export function RecentPage() {
             </Link>
           ))}
         </div>
-      </Section>
+      )}
     </div>
   )
 }
 
-function Section({
-  title,
-  hint,
-  count,
-  onClear,
-  empty,
-  children,
-}: {
-  title: string
-  hint: string
-  count: number
-  onClear?: () => void
-  empty: string
-  children: React.ReactNode
-}) {
+/** 空态（带边框卡片式，同 HomePage 最近播放区块体例） */
+function EmptyBox({ text }: { text: string }) {
   return (
-    <section className="mt-10">
-      <div className="flex items-end justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-neutral-100">{title}</h2>
-          <p className="mt-0.5 text-xs text-neutral-500">{hint}</p>
-        </div>
-        {onClear && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="text-xs text-neutral-500 hover:text-neutral-200"
-          >
-            清空
-          </button>
-        )}
-      </div>
-      {count === 0 ? (
-        <div className="mt-4 rounded-xl border border-neutral-800 px-4 py-8 text-center text-sm text-neutral-500">
-          {empty}
-        </div>
-      ) : (
-        children
-      )}
-    </section>
+    <div className="mt-4 rounded-xl border border-neutral-800 px-4 py-8 text-center text-sm text-neutral-500">
+      {text}
+    </div>
   )
 }
