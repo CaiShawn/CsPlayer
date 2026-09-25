@@ -74,7 +74,7 @@ const FONT_STACK = 'system-ui, "PingFang SC", "Microsoft YaHei", sans-serif'
 export function buildShareCardSpec(source: ShareCardSource, accentHex: string): ShareCardSpec | null {
   if (source.kind === 'song') {
     const { song } = source
-    const meta = [song.albumName, formatDuration(song.durationMs)].filter(Boolean).join(' · ')
+    const meta = [song.albumName, formatDuration(song.durationMs)].filter(Boolean).join(' ')
     return {
       kind: 'song',
       title: song.name,
@@ -106,7 +106,7 @@ export function albumSpecFromDetail(detail: AlbumCardData, accentHex: string): S
     kind: 'album',
     title: detail.name,
     subtitle: detail.artistName,
-    meta: `${detail.tracks.length} 首 · ${formatTotalDuration(totalMs)}`,
+    meta: `${detail.tracks.length} 首 ${formatTotalDuration(totalMs)}`,
     coverUrl: detail.coverUrl,
     accentHex,
   }
