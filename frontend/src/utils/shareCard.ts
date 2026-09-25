@@ -131,7 +131,7 @@ function formatTotalDuration(ms: number): string {
 }
 
 export const COLLAGE_MIN = 2
-export const COLLAGE_MAX = 6
+export const COLLAGE_MAX = 9
 
 /** 拼贴卡 spec（S2）：标题/元信息固定文案，封面列表随选中顺序 */
 export function buildCollageSpec(albums: AlbumBrief[], accentHex: string): ShareCardSpec {
@@ -525,7 +525,7 @@ export function renderShareCard(
 }
 
 /**
- * 拼贴卡（S2）：顶部徽标「唱片墙」+ 标题 + 元信息，主体为选中封面网格，
+ * 拼贴卡（S2）：徽标「唱片墙」+ 封面网格（无标题/元信息），
  * 评论引用体置底（同 S1），背景/色板/导出全部复用单卡链路。
  * covers：与 spec.collageCovers 对齐的像素图（失败项为 null → 占位）。
  */
@@ -549,7 +549,7 @@ export function renderCollageCard(
 
   drawBackground(ctx, W, H, W / 2, H * 0.3, rgb, spec.bgStyle)
 
-  // 顶部文本：徽标 → 标题（单行省略）→ 元信息
+  // 顶部仅徽标（标题/元信息已按要求去除，spec.title 仅用于导出文件名）
   const badgeW = (() => {
     ctx.font = `${f.badge} ${FONT_STACK}`
     return Math.round(ctx.measureText(KIND_LABEL[spec.kind]).width) + 52
@@ -562,28 +562,17 @@ export function renderCollageCard(
   ctx.fillText(KIND_LABEL[spec.kind], pad + 26, pad + 23)
   ctx.textBaseline = 'alphabetic'
 
-  const titleTop = pad + 44 + 28
-  ctx.font = `${f.title} ${FONT_STACK}`
-  setLetterSpacing(ctx, '1px')
-  ctx.fillStyle = '#fafafa'
   const maxTextW = W - 2 * pad
-  ctx.fillText(ellipsize(ctx, spec.title, maxTextW), pad, titleTop + pxOf(f.title))
-  setLetterSpacing(ctx, '0px')
-
-  const metaBaseline = titleTop + pxOf(f.title) + 14 + pxOf(f.meta)
-  ctx.font = `${f.meta} ${FONT_STACK}`
-  ctx.fillStyle = '#a3a3a3'
-  ctx.fillText(ellipsize(ctx, spec.meta, maxTextW), pad, metaBaseline)
 
   // 底部评论区预留（同单卡）；剩余空间给封面网格
   const m = measureStack(ctx, spec, maxTextW, f)
   const commentZone = m.commentLines.length ? m.commentLines.length * f.commentLh + 24 : 0
-  const gridTop = metaBaseline + 24
+  const gridTop = pad + 44 + 28
   const gridBottom = H - BOTTOM_PAD - commentZone - (m.commentLines.length ? 0 : 24)
 
-  // 行列：横版 2→1×2、3–4→2×2、5–6→3×2；竖版 2→2×1（竖叠）、3–4→2×2、5–6→2×3
+  // 行列：横版 2→1×2、3–4→2×2、5–9→3×N；竖版 2→2×1（竖叠）、3–6→2×N、7–9→3×3
   const n = spec.collageCovers?.length ?? 0
-  const cols = horizontal ? (n <= 4 ? 2 : 3) : n <= 2 ? 1 : 2
+  const cols = horizontal ? (n <= 4 ? 2 : 3) : n <= 2 ? 1 : n <= 6 ? 2 : 3
   const rows = Math.ceil(Math.max(n, 1) / cols)
   const gap = 20
   const availW = W - 2 * pad

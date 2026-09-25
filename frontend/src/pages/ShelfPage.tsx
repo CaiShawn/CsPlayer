@@ -213,8 +213,10 @@ export function ShelfPage() {
                     onContextMenu={(e) =>
                       useContextMenuStore.getState().openForEvent(e, { kind: 'album', album: a })
                     }
-                    className={`group rounded-[var(--radius-cover)] border bg-neutral-900/40 p-3 transition hover:bg-neutral-900 ${
-                      isPicked ? 'border-accent/60' : 'border-transparent hover:border-neutral-800'
+                    className={`group rounded-[var(--radius-cover)] border p-3 transition ${
+                      isPicked
+                        ? 'border-transparent bg-accent/15'
+                        : 'border-transparent bg-neutral-900/40 hover:border-neutral-800 hover:bg-neutral-900'
                     }`}
                   >
                     <div className="relative overflow-hidden rounded-[var(--radius-cover)] shadow-lg shadow-black/40 transition duration-200 group-hover:-translate-y-[12px] group-hover:shadow-xl group-hover:shadow-black/50">
