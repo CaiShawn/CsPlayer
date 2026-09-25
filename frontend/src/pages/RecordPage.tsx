@@ -58,7 +58,7 @@ export function RecordPage() {
   }
 
   return (
-    <div className="p-8 pb-28">
+    <div className="p-8 pb-10">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-neutral-50">听歌排行榜</h1>

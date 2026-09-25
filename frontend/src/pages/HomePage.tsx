@@ -56,7 +56,7 @@ export function HomePage() {
   }, [dataVersion])
 
   return (
-    <div className="p-8 pb-28">
+    <div className="p-8 pb-10">
       {/* 欢迎条 */}
       <div className="flex items-center gap-4">
         {user?.avatarUrl ? (

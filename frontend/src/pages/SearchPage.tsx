@@ -130,7 +130,7 @@ export function SearchPage() {
   const showEmpty = !!q && !loading && !error && items.length === 0
 
   return (
-    <div className="p-8 pb-28">
+    <div className="p-8 pb-10">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold text-neutral-50">搜索</h1>

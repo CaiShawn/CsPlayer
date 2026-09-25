@@ -69,7 +69,7 @@ export function LibraryPage() {
   }
 
   return (
-    <div className="space-y-10 p-8 pb-28">
+    <div className="space-y-10 p-8 pb-10">
       {error && (
         <ErrorBar
           message={`${error}（当前显示的是上次缓存内容）`}
@@ -107,7 +107,7 @@ export function LibraryPage() {
 /** 冷加载骨架屏：两节布局与真实内容一致，首屏即刻可交互（§4.3 a） */
 function LibrarySkeleton() {
   return (
-    <div className="space-y-10 p-8 pb-28">
+    <div className="space-y-10 p-8 pb-10">
       {[0, 1].map((i) => (
         <section key={i}>
           <div className="mb-4 h-5 w-28 animate-pulse rounded bg-neutral-800" />

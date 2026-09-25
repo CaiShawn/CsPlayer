@@ -88,7 +88,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div ref={rootRef} className="flex gap-8 p-8 pb-28">
+    <div ref={rootRef} className="flex gap-8 p-8 pb-10">
       {/* 左侧分组锚点：窄栏 + accent 指示条，与主侧边栏（块状高亮）区分；
           sticky top-8 = 始终与顶部保持固定边距（与页面 p-8 一致），不贴顶 */}
       <nav className="sticky top-8 hidden h-fit w-24 shrink-0 self-start lg:block">

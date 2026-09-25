@@ -90,7 +90,7 @@ export function PlaylistPage() {
   }
 
   return (
-    <div className="p-8 pb-28">
+    <div className="p-8 pb-10">
       <DetailHeader
         cover={detail.coverUrl}
         title={detail.name}
@@ -201,7 +201,7 @@ export function AlbumPage() {
   }
 
   return (
-    <div className="p-8 pb-28">
+    <div className="p-8 pb-10">
       <DetailHeader
         cover={detail.coverUrl}
         title={detail.name}

@@ -59,7 +59,7 @@ export function RecentPage() {
   const active = TABS.find((t) => t.id === tab)!
 
   return (
-    <div className="p-8 pb-28">
+    <div className="p-8 pb-10">
       <h1 className="text-2xl font-bold text-neutral-50">最近播放</h1>
 
       {/* Tab 行（SearchPage 体例）+ 右侧提示 / 清空 */}

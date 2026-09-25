@@ -41,7 +41,7 @@ export function MainLayout() {
         <div className="flex min-h-0 flex-1">
           <Sidebar />
           <main
-            className={`min-w-0 flex-1 overflow-y-auto pb-24 pl-2 ${onHome ? 'scrollbar-none' : ''}`}
+            className={`min-w-0 flex-1 overflow-y-auto pb-20 pl-2 ${onHome ? 'scrollbar-none' : ''}`}
           >
             <Outlet />
           </main>

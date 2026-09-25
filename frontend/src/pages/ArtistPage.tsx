@@ -123,7 +123,7 @@ export function ArtistPage() {
   }
 
   return (
-    <div className="p-8 pb-28">
+    <div className="p-8 pb-10">
       <div className="flex flex-col gap-6 sm:flex-row">
         <div className="h-48 w-48 shrink-0 overflow-hidden rounded-full bg-neutral-800 shadow-xl">
           {detail.avatarUrl ? (

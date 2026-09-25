@@ -82,7 +82,7 @@ export function LikePage() {
   }
 
   return (
-    <div className="p-8 pb-24">
+    <div className="p-8 pb-10">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-neutral-50">我喜欢</h1>
@@ -125,11 +125,11 @@ export function LikePage() {
             onToggleLike={onToggleLike}
           />
         )}
-        {/* 分批加载哨兵：整块底部空白（列表底 → 播放条上沿）即本元素 h-36=144px，
-            「加载中」在空白正中垂直居中；-mb-28 抵消 pb-24×2 超出播放条的 112px，
+        {/* 分批加载哨兵：整块底部空白（列表底 → 播放条上沿）即本元素 h-14=56px，
+            「加载中」在空白正中垂直居中；-mb-10 抵消 pb-10+pb-20 超出播放条 h-20 的 40px，
             整体留白不变（哨兵上沿仍在列表底部，滚动触发时机不受影响） */}
         {tracksLoaded && hasMore && (
-          <div ref={sentinelRef} className="-mb-28 flex h-36 items-center justify-center">
+          <div ref={sentinelRef} className="-mb-10 flex h-14 items-center justify-center">
             {loadingMore ? (
               <LoadingMore />
             ) : loadMoreError ? (
