@@ -16,7 +16,6 @@ import {
  * ------------------------------------------------------------------------ */
 
 export type AccentPresetName = 'emerald' | 'cyan' | 'blue' | 'violet' | 'rose' | 'amber' | 'orange'
-export type Density = 'comfortable' | 'compact'
 export type CoverRadius = 'none' | 'md' | 'lg'
 export type UnplayableAction = 'skip' | 'stop'
 export type LyricFontSize = 'sm' | 'md' | 'lg'
@@ -25,7 +24,6 @@ export interface AppearancePrefs {
   accentPreset: AccentPresetName | 'custom'
   /** 自定义颜色（HEX6），仅 accentPreset === 'custom' 时生效 */
   customColor: string
-  density: Density
   coverRadius: CoverRadius
 }
 
@@ -88,7 +86,6 @@ export const DEFAULT_PREFS: Prefs = {
   appearance: {
     accentPreset: 'emerald',
     customColor: '#10b981',
-    density: 'comfortable',
     coverRadius: 'md',
   },
   playback: {
@@ -238,7 +235,7 @@ export function resolvePalette(appearance: AppearancePrefs): AccentPalette {
   return presetPalette(preset ?? ACCENT_PRESETS[0])
 }
 
-/** 把外观偏好写入 DOM：CSS 变量（主题色）+ data 属性（密度 / 封面圆角） */
+/** 把外观偏好写入 DOM：CSS 变量（主题色）+ data 属性（封面圆角） */
 export function applyAppearance(appearance: AppearancePrefs): void {
   if (typeof document === 'undefined') return
   const root = document.documentElement
@@ -247,7 +244,6 @@ export function applyAppearance(appearance: AppearancePrefs): void {
   root.style.setProperty('--color-accent-text', palette.text)
   root.style.setProperty('--color-accent-soft', palette.soft)
   root.style.setProperty('--color-accent-hover', palette.hover)
-  root.dataset.density = appearance.density
   root.dataset.coverRadius = appearance.coverRadius
 }
 
@@ -398,7 +394,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', () => flushBackgroundSave(useSettingsStore.getState().background))
 }
 
-// 启动即应用主题色 / 密度 / 圆角
+// 启动即应用主题色 / 圆角
 applyAppearance(initialPrefs.appearance)
 
 function removeKey(storage: Storage, key: string): void {

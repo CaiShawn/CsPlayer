@@ -121,20 +121,9 @@ export function SettingsPage() {
         </div>
 
         {/* 外观 */}
-        <SettingSection id="appearance" title="外观" desc="主题色、界面密度与封面圆角，修改立即生效">
+        <SettingSection id="appearance" title="外观" desc="主题色与封面圆角，修改立即生效">
           <SettingRow label="主题色（强调色）" hint="预设色板或自定义 HEX 颜色，应用到按钮、导航、进度条等强调色">
             <ColorPicker appearance={prefs.appearance} onChange={updateAppearance} />
-          </SettingRow>
-          <SettingRow label="界面密度" hint="影响列表行高与卡片间距">
-            <Segmented
-              label="界面密度"
-              value={prefs.appearance.density}
-              onChange={(density) => updateAppearance({ density })}
-              options={[
-                { value: 'comfortable', label: '舒适' },
-                { value: 'compact', label: '紧凑' },
-              ]}
-            />
           </SettingRow>
           <SettingRow label="封面圆角" hint="卡片与封面圆角档位">
             <Segmented
