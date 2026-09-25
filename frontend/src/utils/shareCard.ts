@@ -16,7 +16,7 @@ import type {
   PlaylistDetail,
   SongSummary,
 } from '../types'
-import { artistNames, formatDuration } from './format'
+import { artistNames } from './format'
 
 /* ------------------------------------------------------------------------
  * 类型与常量
@@ -37,11 +37,10 @@ export interface ShareCardSpec {
   kind: ShareCardKind
   title: string
   subtitle: string
-  meta: string
   coverUrl: string
   /** 主题 accent（#rrggbb），由调用方派生 */
   accentHex: string
-  /** 个人评论（可选，弹窗输入，渲染在副题与元信息之间；空 = 不占位） */
+  /** 个人评论（可选，弹窗输入，置底渲染；空 = 不占位） */
   comment?: string
 }
 
@@ -71,15 +70,13 @@ const FONT_STACK = 'system-ui, "PingFang SC", "Microsoft YaHei", sans-serif'
  * Spec 构建（数据全部来自现有 target 字段；仅专辑 Brief 缺曲目数时需先拉详情）
  * --------------------------------------------------------------------- */
 
-export function buildShareCardSpec(source: ShareCardSource, accentHex: string): ShareCardSpec | null {
+export function buildShareCardSpec(source: ShareCardSource, accentHex: string): ShareCardSpec {
   if (source.kind === 'song') {
     const { song } = source
-    const meta = [song.albumName, formatDuration(song.durationMs)].filter(Boolean).join(' · ')
     return {
       kind: 'song',
       title: song.name,
       subtitle: artistNames(song.artists),
-      meta,
       coverUrl: song.coverUrl,
       accentHex,
     }
@@ -90,37 +87,18 @@ export function buildShareCardSpec(source: ShareCardSource, accentHex: string): 
       kind: 'playlist',
       title: p.name,
       subtitle: p.creatorName || '歌单',
-      meta: `${p.trackCount} 首`,
       coverUrl: p.coverUrl,
       accentHex,
     }
   }
-  // 专辑：Brief 无曲目数据 → 返回 null，调用方补拉详情后走 albumSpecFromDetail
-  if ('tracks' in source.album) return albumSpecFromDetail(source.album, accentHex)
-  return null
-}
-
-export function albumSpecFromDetail(detail: AlbumCardData, accentHex: string): ShareCardSpec {
-  const totalMs = detail.tracks.reduce((sum, t) => sum + (t.durationMs || 0), 0)
+  const a = source.album
   return {
     kind: 'album',
-    title: detail.name,
-    subtitle: detail.artistName,
-    meta: `${detail.tracks.length} 首 · ${formatTotalDuration(totalMs)}`,
-    coverUrl: detail.coverUrl,
+    title: a.name,
+    subtitle: a.artistName,
+    coverUrl: a.coverUrl,
     accentHex,
   }
-}
-
-/** 超过 1h 用 h:mm:ss，否则 m:ss（formatDuration 的 m:ss 封顶不够用） */
-function formatTotalDuration(ms: number): string {
-  if (!ms || ms < 0) return '0:00'
-  const total = Math.round(ms / 1000)
-  const h = Math.floor(total / 3600)
-  const m = Math.floor((total % 3600) / 60)
-  const s = total % 60
-  const ss = s.toString().padStart(2, '0')
-  return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${ss}` : `${m}:${ss}`
 }
 
 /** Windows 非法文件名字符清洗（设计 §1.3 导出流程） */
@@ -149,7 +127,6 @@ interface Fonts {
   comment: string
   commentLh: number
   commentMax: number
-  meta: string
 }
 
 const V_FONTS: Fonts = {
@@ -162,7 +139,6 @@ const V_FONTS: Fonts = {
   comment: '400 28px',
   commentLh: 42,
   commentMax: 2,
-  meta: '400 27px',
 }
 
 const H_FONTS: Fonts = {
@@ -175,7 +151,6 @@ const H_FONTS: Fonts = {
   comment: '400 28px',
   commentLh: 42,
   commentMax: 2,
-  meta: '400 28px',
 }
 
 function pxOf(font: string): number {
@@ -263,16 +238,16 @@ function measureStack(ctx: CanvasRenderingContext2D, spec: ShareCardSpec, maxW: 
   return { titleLines, commentLines }
 }
 
-/** 文本栈总高（徽标 + 标题 + 副题 + 评论? + 元信息） */
+/** 文本栈总高（徽标 + 标题 + 副题 + 评论置底?） */
 function stackHeight(f: Fonts, titleLines: number, commentLines: number): number {
   let h = 44 + 36 + titleLines * f.titleLh + 22 + f.subtitleLh
-  if (commentLines > 0) h += 20 + commentLines * f.commentLh + 22
-  return h + 36
+  if (commentLines > 0) h += 20 + commentLines * f.commentLh
+  return h
 }
 
 /**
- * 文本栈绘制（徽标 → 标题 → 副题 → 评论? → 元信息），返回实际占用高度。
- * 评论为引用体：accent 竖线 + 浅色文字；元信息前置 accent 分隔点。
+ * 文本栈绘制（徽标 → 标题 → 副题 → 评论置底?），返回实际占用高度。
+ * 评论为引用体：accent 竖线 + 浅色文字，位于文本栈最后一位。
  */
 function drawStack(
   ctx: CanvasRenderingContext2D,
@@ -312,7 +287,7 @@ function drawStack(
   ctx.fillText(ellipsize(ctx, spec.subtitle, maxW), x, y + pxOf(f.subtitle))
   y += f.subtitleLh
 
-  // 个人评论（引用体：accent 竖线 + 浅色文字）
+  // 个人评论（引用体：accent 竖线 + 浅色文字，置底）
   if (m.commentLines.length) {
     y += 20
     const barH = m.commentLines.length * f.commentLh - 8
@@ -324,18 +299,8 @@ function drawStack(
     m.commentLines.forEach((line, i) => {
       ctx.fillText(line, x + 20, y + f.commentLh * i + pxOf(f.comment))
     })
-    y += m.commentLines.length * f.commentLh + 22
+    y += m.commentLines.length * f.commentLh
   }
-
-  // 元信息（前置 accent 分隔点）
-  ctx.fillStyle = spec.accentHex
-  ctx.beginPath()
-  ctx.arc(x + 4, y + 22, 4, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.font = `${f.meta} ${FONT_STACK}`
-  ctx.fillStyle = '#a3a3a3'
-  ctx.fillText(ellipsize(ctx, spec.meta, maxW - 18), x + 18, y + 26)
-  y += 36
 
   return y - start
 }
