@@ -221,13 +221,17 @@ export function ShareCardModal() {
         </div>
         <p className="mt-1 text-xs text-neutral-500">生成图片卡片（不含链接与二维码），保存后自行分享</p>
 
-        <div className="mt-4 flex min-h-0 flex-1 items-center justify-center overflow-y-auto rounded-xl bg-neutral-950/60 py-4">
+        {/* 注意不能用 items-center：画布高于容器（竖版比例）时居中会把顶部溢出切掉且滚不到（徽标被切）。
+            子项 m-auto：有空间时居中，溢出时自动顶对齐、可正常滚动 */}
+        <div className="mt-4 flex min-h-0 flex-1 justify-center overflow-y-auto rounded-xl bg-neutral-950/60 py-4">
           {failed ? (
-            <div className="px-6 text-center text-sm text-neutral-400">卡片数据准备失败，请关闭后重试</div>
+            <div className="m-auto px-6 text-center text-sm text-neutral-400">卡片数据准备失败，请关闭后重试</div>
           ) : !finalSpec || !coverDone ? (
-            <Loading text="" />
+            <div className="m-auto">
+              <Loading text="" />
+            </div>
           ) : (
-            <canvas ref={canvasRef} className="rounded-lg shadow-lg" aria-label="分享卡片预览" />
+            <canvas ref={canvasRef} className="m-auto rounded-lg shadow-lg" aria-label="分享卡片预览" />
           )}
         </div>
 
