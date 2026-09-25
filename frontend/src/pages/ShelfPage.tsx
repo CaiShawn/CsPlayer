@@ -162,7 +162,7 @@ export function ShelfPage() {
 
   return (
     <div className="p-8 pb-24">
-      <h1 className="text-2xl font-bold text-neutral-50">唱片墙</h1>
+      <h1 className="text-2xl font-bold text-neutral-50">唱片架</h1>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-neutral-500">
           {loadingAll

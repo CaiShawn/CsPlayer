@@ -53,7 +53,7 @@ export function ShareCardModal() {
   const [comment, setComment] = useState('') // 个人评论（可选，实时预览）
   const [accent, setAccent] = useState('#10b981') // 主题色（弹窗内可切换，切换对象时重置回主题）
   const [bgMode, setBgMode] = useState<'gradient' | 'solid'>('gradient') // 背景样式
-  const [showBadge, setShowBadge] = useState(true) // 拼贴卡徽标「唱片墙」
+  const [showBadge, setShowBadge] = useState(true) // 拼贴卡徽标「唱片架」
   const [cover, setCover] = useState<HTMLImageElement | null>(null)
   const [covers, setCovers] = useState<(HTMLImageElement | null)[]>([]) // 拼贴卡多封面（与 collageCovers 对齐）
   const [coverDone, setCoverDone] = useState(false) // 封面加载已完结（成功或失败）

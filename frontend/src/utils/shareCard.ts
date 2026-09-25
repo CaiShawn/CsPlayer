@@ -32,7 +32,7 @@ export type ShareCardSource =
   | { kind: 'song'; song: SongSummary }
   | { kind: 'album'; album: AlbumBrief | AlbumCardData }
   | { kind: 'playlist'; playlist: PlaylistBrief | PlaylistDetail }
-  | { kind: 'collage'; albums: AlbumBrief[] } // 唱片墙拼贴卡（S2）：选中 2–6 张专辑
+  | { kind: 'collage'; albums: AlbumBrief[] } // 唱片架拼贴卡（S2）：选中 2–6 张专辑
 
 export interface ShareCardSpec {
   kind: ShareCardKind
@@ -48,7 +48,7 @@ export interface ShareCardSpec {
   bgStyle?: 'gradient' | 'solid'
   /** 拼贴卡（kind='collage'）：参与拼贴的封面 URL 列表 */
   collageCovers?: string[]
-  /** 拼贴卡徽标「唱片墙」显示开关（默认显示） */
+  /** 拼贴卡徽标「唱片架」显示开关（默认显示） */
   showBadge?: boolean
 }
 
@@ -70,7 +70,7 @@ const KIND_LABEL: Record<ShareCardKind, string> = {
   song: '单曲',
   album: '专辑',
   playlist: '歌单',
-  collage: '唱片墙',
+  collage: '唱片架',
 }
 
 const FONT_STACK = 'system-ui, "PingFang SC", "Microsoft YaHei", sans-serif'
@@ -139,7 +139,7 @@ export const COLLAGE_MAX = 9
 export function buildCollageSpec(albums: AlbumBrief[], accentHex: string): ShareCardSpec {
   return {
     kind: 'collage',
-    title: '我的唱片墙',
+    title: '我的唱片架',
     subtitle: '',
     meta: `${albums.length} 张专辑`,
     coverUrl: albums[0]?.coverUrl ?? '',
@@ -544,7 +544,7 @@ export function renderShareCard(
 }
 
 /**
- * 拼贴卡（S2）：徽标「唱片墙」+ 封面网格（无标题/元信息），
+ * 拼贴卡（S2）：徽标「唱片架」+ 封面网格（无标题/元信息），
  * 评论引用体置底（同 S1），背景/色板/导出全部复用单卡链路。
  * covers：与 spec.collageCovers 对齐的像素图（失败项为 null → 占位）。
  */
@@ -568,7 +568,7 @@ export function renderCollageCard(
 
   drawBackground(ctx, W, H, W / 2, H * 0.3, rgb, spec.bgStyle)
 
-  // 顶部徽标「唱片墙」（showBadge=false 可取消；标题/元信息已去除，spec.title 仅用于导出文件名）
+  // 顶部徽标「唱片架」（showBadge=false 可取消；标题/元信息已去除，spec.title 仅用于导出文件名）
   const showBadge = spec.showBadge !== false
   const badgeW = showBadge
     ? (() => {
