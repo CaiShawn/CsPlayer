@@ -151,7 +151,7 @@ export function ShelfPage() {
                       isPicked ? 'border-accent/60' : 'border-transparent hover:border-neutral-800'
                     }`}
                   >
-                    <div className="relative overflow-hidden rounded-[var(--radius-cover)] shadow-lg shadow-black/40 transition duration-200 group-hover:-translate-y-1 group-hover:shadow-xl group-hover:shadow-black/50">
+                    <div className="relative overflow-hidden rounded-[var(--radius-cover)] shadow-lg shadow-black/40 transition duration-200 group-hover:-translate-y-1.5 group-hover:shadow-xl group-hover:shadow-black/50">
                       <Cover url={a.coverUrl} className="aspect-square w-full" />
                       {/* 光泽：右上斜向高光，hover 增强 */}
                       <span className="pointer-events-none absolute inset-0 rounded-[var(--radius-cover)] bg-gradient-to-br from-white/[0.08] via-transparent to-transparent opacity-50 transition group-hover:opacity-100" />
