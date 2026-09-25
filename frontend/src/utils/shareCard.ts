@@ -48,6 +48,8 @@ export interface ShareCardSpec {
   bgStyle?: 'gradient' | 'solid'
   /** 拼贴卡（kind='collage'）：参与拼贴的封面 URL 列表 */
   collageCovers?: string[]
+  /** 拼贴卡徽标「唱片墙」显示开关（默认显示） */
+  showBadge?: boolean
 }
 
 /** 导出基准像素（竖版 1080 宽、横版 1080 高） */
@@ -566,25 +568,30 @@ export function renderCollageCard(
 
   drawBackground(ctx, W, H, W / 2, H * 0.3, rgb, spec.bgStyle)
 
-  // 顶部仅徽标（标题/元信息已按要求去除，spec.title 仅用于导出文件名）
-  const badgeW = (() => {
-    ctx.font = `${f.badge} ${FONT_STACK}`
-    return Math.round(ctx.measureText(KIND_LABEL[spec.kind]).width) + 52
-  })()
-  roundRectPath(ctx, pad, pad, badgeW, 44, 22)
-  ctx.fillStyle = spec.accentHex
-  ctx.fill()
-  ctx.fillStyle = '#0a0a0a'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(KIND_LABEL[spec.kind], pad + 26, pad + 23)
-  ctx.textBaseline = 'alphabetic'
+  // 顶部徽标「唱片墙」（showBadge=false 可取消；标题/元信息已去除，spec.title 仅用于导出文件名）
+  const showBadge = spec.showBadge !== false
+  const badgeW = showBadge
+    ? (() => {
+        ctx.font = `${f.badge} ${FONT_STACK}`
+        return Math.round(ctx.measureText(KIND_LABEL[spec.kind]).width) + 52
+      })()
+    : 0
+  if (showBadge) {
+    roundRectPath(ctx, pad, pad, badgeW, 44, 22)
+    ctx.fillStyle = spec.accentHex
+    ctx.fill()
+    ctx.fillStyle = '#0a0a0a'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(KIND_LABEL[spec.kind], pad + 26, pad + 23)
+    ctx.textBaseline = 'alphabetic'
+  }
 
   const maxTextW = W - 2 * pad
 
   // 底部评论区预留（同单卡）；剩余空间给封面网格
   const m = measureStack(ctx, spec, maxTextW, f)
   const commentZone = m.commentLines.length ? m.commentLines.length * f.commentLh + 24 : 0
-  const gridTop = pad + 44 + 28
+  const gridTop = pad + (showBadge ? 44 + 28 : 0)
   const gridBottom = H - BOTTOM_PAD - commentZone - (m.commentLines.length ? 0 : 24)
 
   // 行列：横版 2→1×2、3–4→2×2、5–9→3×N；竖版 2→2×1（竖叠）、3–6→2×N、7–9→3×3
