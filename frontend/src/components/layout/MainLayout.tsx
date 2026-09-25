@@ -7,6 +7,7 @@ import { usePlayerStore } from '../../stores/playerStore'
 import { useAudioEngine } from '../../hooks/useAudioEngine'
 import { ContextMenu } from '../common/ContextMenu'
 import { BackgroundLayer } from '../common/BackgroundLayer'
+import { ShareCardModal } from '../share/ShareCardModal'
 import { PlayerBar } from '../player/PlayerBar'
 import { QueuePanel } from '../player/QueuePanel'
 import { LyricPanel } from '../lyric/LyricPanel'
@@ -50,6 +51,8 @@ export function MainLayout() {
         <QueuePanel />
         {/* 全站唯一右键菜单实例（portal） */}
         <ContextMenu />
+        {/* 分享卡片弹窗（v0.1.8 S1）：自取 uiStore.shareSource，无入参时为 null 不渲染 */}
+        <ShareCardModal />
         <Toast message={toast} onClose={() => setToast('')} />
       </div>
     </>
