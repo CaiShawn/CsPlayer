@@ -22,7 +22,7 @@ import { artistNames, formatDuration } from './format'
  * 类型与常量
  * --------------------------------------------------------------------- */
 
-export type ShareCardKind = 'song' | 'album' | 'playlist'
+export type ShareCardKind = 'song' | 'album' | 'playlist' | 'collage'
 
 /** 弹窗入参：直接携带现有 target 数据（Brief 即可起卡片；专辑缺曲目数时补拉详情） */
 /** 专辑卡片所需最小结构（专辑页内联裁剪态 / AlbumDetail 均可赋值） */
@@ -32,6 +32,7 @@ export type ShareCardSource =
   | { kind: 'song'; song: SongSummary }
   | { kind: 'album'; album: AlbumBrief | AlbumCardData }
   | { kind: 'playlist'; playlist: PlaylistBrief | PlaylistDetail }
+  | { kind: 'collage'; albums: AlbumBrief[] } // 唱片墙拼贴卡（S2）：选中 2–6 张专辑
 
 export interface ShareCardSpec {
   kind: ShareCardKind
@@ -45,6 +46,8 @@ export interface ShareCardSpec {
   comment?: string
   /** 背景样式：渐变海报底（默认）/ 纯色 */
   bgStyle?: 'gradient' | 'solid'
+  /** 拼贴卡（kind='collage'）：参与拼贴的封面 URL 列表 */
+  collageCovers?: string[]
 }
 
 /** 导出基准像素（竖版 1080 宽、横版 1080 高） */
@@ -65,6 +68,7 @@ const KIND_LABEL: Record<ShareCardKind, string> = {
   song: '单曲',
   album: '专辑',
   playlist: '歌单',
+  collage: '唱片墙',
 }
 
 const FONT_STACK = 'system-ui, "PingFang SC", "Microsoft YaHei", sans-serif'
@@ -74,6 +78,7 @@ const FONT_STACK = 'system-ui, "PingFang SC", "Microsoft YaHei", sans-serif'
  * --------------------------------------------------------------------- */
 
 export function buildShareCardSpec(source: ShareCardSource, accentHex: string): ShareCardSpec | null {
+  if (source.kind === 'collage') return buildCollageSpec(source.albums, accentHex)
   if (source.kind === 'song') {
     const { song } = source
     const meta = [song.albumName, formatDuration(song.durationMs)].filter(Boolean).join(' · ')
@@ -123,6 +128,22 @@ function formatTotalDuration(ms: number): string {
   const s = total % 60
   const ss = s.toString().padStart(2, '0')
   return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${ss}` : `${m}:${ss}`
+}
+
+export const COLLAGE_MIN = 2
+export const COLLAGE_MAX = 6
+
+/** 拼贴卡 spec（S2）：标题/元信息固定文案，封面列表随选中顺序 */
+export function buildCollageSpec(albums: AlbumBrief[], accentHex: string): ShareCardSpec {
+  return {
+    kind: 'collage',
+    title: '我的唱片墙',
+    subtitle: '',
+    meta: `${albums.length} 张专辑`,
+    coverUrl: albums[0]?.coverUrl ?? '',
+    collageCovers: albums.map((a) => a.coverUrl),
+    accentHex,
+  }
 }
 
 /** Windows 非法文件名字符清洗（设计 §1.3 导出流程） */
@@ -503,20 +524,100 @@ export function renderShareCard(
   }
 }
 
+/**
+ * 拼贴卡（S2）：顶部徽标「唱片墙」+ 标题 + 元信息，主体为选中封面网格，
+ * 评论引用体置底（同 S1），背景/色板/导出全部复用单卡链路。
+ * covers：与 spec.collageCovers 对齐的像素图（失败项为 null → 占位）。
+ */
+export function renderCollageCard(
+  canvas: HTMLCanvasElement,
+  spec: ShareCardSpec,
+  ratio: ShareCardRatio,
+  covers: (HTMLImageElement | null)[],
+  scale = 1,
+): void {
+  const { w: W, h: H } = SHARE_CARD_SIZES[ratio]
+  canvas.width = Math.round(W * scale)
+  canvas.height = Math.round(H * scale)
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.setTransform(scale, 0, 0, scale, 0, 0)
+  const rgb = hexToRgb(spec.accentHex)
+  const horizontal = W > H
+  const f = horizontal ? H_FONTS : V_FONTS
+  const pad = horizontal ? H_PAGE_PAD : PAGE_PAD
+
+  drawBackground(ctx, W, H, W / 2, H * 0.3, rgb, spec.bgStyle)
+
+  // 顶部文本：徽标 → 标题（单行省略）→ 元信息
+  const badgeW = (() => {
+    ctx.font = `${f.badge} ${FONT_STACK}`
+    return Math.round(ctx.measureText(KIND_LABEL[spec.kind]).width) + 52
+  })()
+  roundRectPath(ctx, pad, pad, badgeW, 44, 22)
+  ctx.fillStyle = spec.accentHex
+  ctx.fill()
+  ctx.fillStyle = '#0a0a0a'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(KIND_LABEL[spec.kind], pad + 26, pad + 23)
+  ctx.textBaseline = 'alphabetic'
+
+  const titleTop = pad + 44 + 28
+  ctx.font = `${f.title} ${FONT_STACK}`
+  setLetterSpacing(ctx, '1px')
+  ctx.fillStyle = '#fafafa'
+  const maxTextW = W - 2 * pad
+  ctx.fillText(ellipsize(ctx, spec.title, maxTextW), pad, titleTop + pxOf(f.title))
+  setLetterSpacing(ctx, '0px')
+
+  const metaBaseline = titleTop + pxOf(f.title) + 14 + pxOf(f.meta)
+  ctx.font = `${f.meta} ${FONT_STACK}`
+  ctx.fillStyle = '#a3a3a3'
+  ctx.fillText(ellipsize(ctx, spec.meta, maxTextW), pad, metaBaseline)
+
+  // 底部评论区预留（同单卡）；剩余空间给封面网格
+  const m = measureStack(ctx, spec, maxTextW, f)
+  const commentZone = m.commentLines.length ? m.commentLines.length * f.commentLh + 24 : 0
+  const gridTop = metaBaseline + 24
+  const gridBottom = H - BOTTOM_PAD - commentZone - (m.commentLines.length ? 0 : 24)
+
+  // 行列：横版 2→1×2、3–4→2×2、5–6→3×2；竖版 2→2×1（竖叠）、3–4→2×2、5–6→2×3
+  const n = spec.collageCovers?.length ?? 0
+  const cols = horizontal ? (n <= 4 ? 2 : 3) : n <= 2 ? 1 : 2
+  const rows = Math.ceil(Math.max(n, 1) / cols)
+  const gap = 20
+  const availW = W - 2 * pad
+  const availH = Math.max(gridBottom - gridTop, 100)
+  const cell = Math.min((availW - (cols - 1) * gap) / cols, (availH - (rows - 1) * gap) / rows)
+  const gridW = cols * cell + (cols - 1) * gap
+  const gridH = rows * cell + (rows - 1) * gap
+  const gridX = pad + (availW - gridW) / 2
+  const gridY = gridTop + Math.max(0, (availH - gridH) / 2)
+  spec.collageCovers?.forEach((_, i) => {
+    const c = i % cols
+    const r = Math.floor(i / cols)
+    drawCover(ctx, gridX + c * (cell + gap), gridY + r * (cell + gap), cell, covers[i] ?? null, rgb)
+  })
+
+  drawCommentBottom(ctx, spec, m, f, pad, H)
+}
+
 /* ------------------------------------------------------------------------
  * 导出
  * --------------------------------------------------------------------- */
 
 /**
  * 离屏渲染 → JPEG Blob（scale=1 基准尺寸，画质 0.92）。
- * 统一导出 JPG（需求方定）。
+ * 统一导出 JPG（需求方定）；kind='collage' 走拼贴渲染（covers 对齐 spec.collageCovers）。
  */
 export async function exportShareCardBlob(
   spec: ShareCardSpec,
   ratio: ShareCardRatio,
   cover: HTMLImageElement | null,
+  covers?: (HTMLImageElement | null)[],
 ): Promise<Blob | null> {
   const canvas = document.createElement('canvas')
-  renderShareCard(canvas, spec, ratio, cover, 1)
+  if (spec.kind === 'collage') renderCollageCard(canvas, spec, ratio, covers ?? [], 1)
+  else renderShareCard(canvas, spec, ratio, cover, 1)
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92))
 }

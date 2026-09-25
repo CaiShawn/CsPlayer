@@ -6,8 +6,10 @@ import { ACCENT_PRESETS, normalizeHex } from '../../utils/color'
 import { loadCoverImage } from '../../utils/coverImage'
 import {
   albumSpecFromDetail,
+  buildCollageSpec,
   buildShareCardSpec,
   exportShareCardBlob,
+  renderCollageCard,
   renderShareCard,
   sanitizeFilename,
   SHARE_CARD_RATIOS,
@@ -52,6 +54,7 @@ export function ShareCardModal() {
   const [accent, setAccent] = useState('#10b981') // 主题色（弹窗内可切换，切换对象时重置回主题）
   const [bgMode, setBgMode] = useState<'gradient' | 'solid'>('gradient') // 背景样式
   const [cover, setCover] = useState<HTMLImageElement | null>(null)
+  const [covers, setCovers] = useState<(HTMLImageElement | null)[]>([]) // 拼贴卡多封面（与 collageCovers 对齐）
   const [coverDone, setCoverDone] = useState(false) // 封面加载已完结（成功或失败）
   const [failed, setFailed] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -85,6 +88,11 @@ export function ShareCardModal() {
     let cancelled = false
     ;(async () => {
       try {
+        // 拼贴卡（S2）：同步构建，无接口调用
+        if (source.kind === 'collage') {
+          if (!cancelled) setSpec(buildCollageSpec(source.albums, currentAccentHex()))
+          return
+        }
         // 基础 accent 用当前主题色即可，弹窗内选色由 finalSpec 覆盖（避免换色触发重拉）
         let s = buildShareCardSpec(source, currentAccentHex())
         if (!s && source.kind === 'album') {
@@ -101,8 +109,9 @@ export function ShareCardModal() {
     }
   }, [source])
 
-  // 封面像素（失败 → null，渲染层出占位）
+  // 封面像素（失败 → null，渲染层出占位）；拼贴卡走多封面分支
   useEffect(() => {
+    if (spec?.collageCovers) return
     const url = spec?.coverUrl
     if (!url) {
       setCover(null)
@@ -119,7 +128,23 @@ export function ShareCardModal() {
     return () => {
       cancelled = true
     }
-  }, [spec?.coverUrl])
+  }, [spec?.coverUrl, spec?.collageCovers])
+
+  // 拼贴卡多封面并行预载（loadCoverImage 模块级缓存；失败项 null → 占位）
+  useEffect(() => {
+    const urls = spec?.collageCovers
+    if (!urls) return
+    let cancelled = false
+    setCoverDone(false)
+    void Promise.all(urls.map((u) => loadCoverImage(u))).then((imgs) => {
+      if (cancelled) return
+      setCovers(imgs)
+      setCoverDone(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [spec?.collageCovers])
 
   // 预览绘制（dpr 适配防锯齿，缩放基准为版式宽；spec/封面/比例任一变化即重绘）
   useEffect(() => {
@@ -128,10 +153,11 @@ export function ShareCardModal() {
     const dpr = Math.min(window.devicePixelRatio || 1, 3)
     const base = SHARE_CARD_SIZES[ratio]
     const scale = (PREVIEW_W * dpr) / base.w
-    renderShareCard(canvas, finalSpec, ratio, cover, scale)
+    if (finalSpec.kind === 'collage') renderCollageCard(canvas, finalSpec, ratio, covers, scale)
+    else renderShareCard(canvas, finalSpec, ratio, cover, scale)
     canvas.style.width = `${PREVIEW_W}px`
     canvas.style.height = `${Math.round((PREVIEW_W * base.h) / base.w)}px`
-  }, [finalSpec, cover, ratio])
+  }, [finalSpec, cover, covers, ratio])
 
   // Esc 关闭
   useEffect(() => {
@@ -149,7 +175,7 @@ export function ShareCardModal() {
     if (!finalSpec || busy) return
     setBusy(true)
     try {
-      const blob = await exportShareCardBlob(finalSpec, ratio, cover)
+      const blob = await exportShareCardBlob(finalSpec, ratio, cover, covers)
       if (!blob) {
         useUiStore.getState().setToast('导出失败，请重试')
         return
