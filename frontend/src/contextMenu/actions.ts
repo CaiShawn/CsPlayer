@@ -6,6 +6,7 @@ import type { NavigateFunction } from 'react-router-dom'
 import { libraryApi } from '../api'
 import { useLikesStore } from '../stores/likesStore'
 import { usePlayerStore } from '../stores/playerStore'
+import { useUiStore } from '../stores/uiStore'
 import type { SongSummary } from '../types'
 import { copyText } from '../utils/clipboard'
 import type { ContextGroupPrefs, ContextKind, ContextTarget } from './types'
@@ -247,6 +248,19 @@ export const CONTEXT_ACTIONS: ContextAction[] = [
       if (!song) return
       const ok = await copyText(String(song.id))
       toast(ok ? `已复制歌曲 ID：${song.id}` : '复制失败')
+    },
+  },
+  {
+    id: 'shareCard',
+    label: '分享卡片',
+    icon: '◫',
+    kinds: ['song', 'album', 'playlist'],
+    run: ({ target, close }) => {
+      close()
+      // 入参直接携带现有 target 数据（设计 §1.5）；专辑缺曲目数时由弹窗补拉详情
+      if (target.kind === 'song') useUiStore.getState().openShareCard({ kind: 'song', song: target.song })
+      else if (target.kind === 'album') useUiStore.getState().openShareCard({ kind: 'album', album: target.album })
+      else useUiStore.getState().openShareCard({ kind: 'playlist', playlist: target.playlist })
     },
   },
 ]

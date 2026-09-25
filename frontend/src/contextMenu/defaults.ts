@@ -16,9 +16,10 @@ export const DEFAULT_CONTEXT_ORDER: Record<ContextKind, string[]> = {
     'viewArtist',
     'copyLink',
     'copySongId',
+    'shareCard',
   ],
-  album: ['play', 'playNext', 'addQueue', 'viewArtist', 'copyLink'],
-  playlist: ['play', 'playNext', 'addQueue', 'copyLink'],
+  album: ['play', 'playNext', 'addQueue', 'viewArtist', 'copyLink', 'shareCard'],
+  playlist: ['play', 'playNext', 'addQueue', 'copyLink', 'shareCard'],
 }
 
 function defaultGroup(kind: ContextKind): ContextGroupPrefs {
