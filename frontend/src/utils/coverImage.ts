@@ -2,7 +2,7 @@
  * 封面图片像素获取唯一入口（v0.1.8 S1 分享卡片用）。
  *
  * S1-1 实测（2026-09-25）：网易云封面 CDN 返回 `Access-Control-Allow-Origin: *`，
- * `crossOrigin='anonymous'` 直连即可读出像素（docs/V0.1.8_DESIGN.md §1.3）。
+ * `crossOrigin='anonymous'` 直连即可读出像素（docs/archived/V0.1.8_DESIGN.md §1.3）。
  * 若后续引入代理或 v0.2.0 迁移调整获取方式，只改本模块。
  *
  * 模块级缓存（含失败负缓存）：同一 URL 会话内只加载一次；
