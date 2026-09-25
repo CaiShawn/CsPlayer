@@ -411,17 +411,32 @@ function drawBackground(
   ctx.fillRect(0, 0, W, H)
 }
 
-/** 封面：柔和投影（圆角矩形预投）→ 中心裁方贴图 → 1px 微描边；无图出占位 */
-function drawCover(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, cover: HTMLImageElement | null, rgb: [number, number, number]) {
-  const R = 28
-  ctx.save()
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)'
-  ctx.shadowBlur = size * 0.06
-  ctx.shadowOffsetY = size * 0.02
-  ctx.fillStyle = '#0f0f0f'
-  roundRectPath(ctx, x, y, size, size, R)
-  ctx.fill()
-  ctx.restore()
+/**
+ * 封面：柔和投影（圆角矩形预投）→ 中心裁方贴图 → 1px 微描边；无图出占位。
+ * opts.frame=false 时无投影/描边（拼贴无缝平铺用，投影会压到相邻封面）；
+ * opts.round 控制圆角半径（拼贴传 0 = 直角）。
+ */
+function drawCover(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  cover: HTMLImageElement | null,
+  rgb: [number, number, number],
+  opts: { round?: number; frame?: boolean } = {},
+) {
+  const R = opts.round ?? 28
+  const frame = opts.frame ?? true
+  if (frame) {
+    ctx.save()
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)'
+    ctx.shadowBlur = size * 0.06
+    ctx.shadowOffsetY = size * 0.02
+    ctx.fillStyle = '#0f0f0f'
+    roundRectPath(ctx, x, y, size, size, R)
+    ctx.fill()
+    ctx.restore()
+  }
 
   roundRectPath(ctx, x, y, size, size, R)
   ctx.save()
@@ -444,10 +459,12 @@ function drawCover(ctx: CanvasRenderingContext2D, x: number, y: number, size: nu
   }
   ctx.restore()
 
-  roundRectPath(ctx, x, y, size, size, R)
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)'
-  ctx.lineWidth = 2
-  ctx.stroke()
+  if (frame) {
+    roundRectPath(ctx, x, y, size, size, R)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)'
+    ctx.lineWidth = 2
+    ctx.stroke()
+  }
 }
 
 /**
@@ -574,7 +591,8 @@ export function renderCollageCard(
   const n = spec.collageCovers?.length ?? 0
   const cols = horizontal ? (n <= 4 ? 2 : 3) : n <= 2 ? 1 : n <= 6 ? 2 : 3
   const rows = Math.ceil(Math.max(n, 1) / cols)
-  const gap = 20
+  // 无缝平铺：无间隙、直角、无投影描边
+  const gap = 0
   const availW = W - 2 * pad
   const availH = Math.max(gridBottom - gridTop, 100)
   const cell = Math.min((availW - (cols - 1) * gap) / cols, (availH - (rows - 1) * gap) / rows)
@@ -585,7 +603,10 @@ export function renderCollageCard(
   spec.collageCovers?.forEach((_, i) => {
     const c = i % cols
     const r = Math.floor(i / cols)
-    drawCover(ctx, gridX + c * (cell + gap), gridY + r * (cell + gap), cell, covers[i] ?? null, rgb)
+    drawCover(ctx, gridX + c * cell, gridY + r * cell, cell, covers[i] ?? null, rgb, {
+      round: 0,
+      frame: false,
+    })
   })
 
   drawCommentBottom(ctx, spec, m, f, pad, H)
