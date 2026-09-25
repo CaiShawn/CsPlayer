@@ -14,8 +14,8 @@ interface LibraryData {
 
 /** SWR 内存快照（§4.3 a）：二次进入立即渲染缓存内容（<100ms），后台静默刷新；
  *  按 authStore.dataVersion 归属，切账号不串数据。
- *  v0.1.7：收藏的专辑改由唱片架展示（滚动分批加载），音乐库只留跳转入口，
- *  不再重复加载专辑。 */
+ *  v0.1.7：收藏的专辑改由唱片架展示（滚动分批加载），音乐库只留歌单两节；
+ *  v0.1.8 S4：「收藏的专辑」跳转入口亦移除（唱片架在侧栏/首页均有入口）。 */
 let snapshot: { version: number; data: LibraryData } | null = null
 
 export function LibraryPage() {
@@ -100,21 +100,15 @@ export function LibraryPage() {
         )}
       </Section>
 
-      {/* 收藏的专辑统一在唱片架展示（滚动分批加载），这里只留跳转入口 */}
-      <Section title="收藏的专辑">
-        <CardGrid>
-          <ShelfLinkCard />
-        </CardGrid>
-      </Section>
     </div>
   )
 }
 
-/** 冷加载骨架屏：三节布局与真实内容一致，首屏即刻可交互（§4.3 a） */
+/** 冷加载骨架屏：两节布局与真实内容一致，首屏即刻可交互（§4.3 a） */
 function LibrarySkeleton() {
   return (
     <div className="space-y-10 p-8 pb-28">
-      {[0, 1, 2].map((i) => (
+      {[0, 1].map((i) => (
         <section key={i}>
           <div className="mb-4 h-5 w-28 animate-pulse rounded bg-neutral-800" />
           <CardGridSkeleton count={5} />
@@ -160,18 +154,3 @@ function PlaylistCard({ playlist }: { playlist: PlaylistBrief }) {
   )
 }
 
-/** 「收藏的专辑」入口卡：点击跳唱片架（专辑在那边分批加载，不在此重复请求） */
-function ShelfLinkCard() {
-  return (
-    <Link
-      to="/shelf"
-      className="group rounded-[var(--radius-cover)] border border-transparent bg-neutral-900/40 p-3 transition hover:border-neutral-800 hover:bg-neutral-900"
-    >
-      <div className="flex aspect-square w-full items-center justify-center rounded-[var(--radius-cover)] bg-neutral-800/70 text-4xl text-neutral-500 transition group-hover:text-accent-soft">
-        ♫
-      </div>
-      <div className="mt-2 truncate text-sm text-neutral-100">查看全部收藏专辑</div>
-      <div className="mt-0.5 text-xs text-neutral-500">前往唱片架 →</div>
-    </Link>
-  )
-}
