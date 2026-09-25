@@ -7,7 +7,7 @@ import { loadCoverImage } from '../../utils/coverImage'
 import {
   albumSpecFromDetail,
   buildShareCardSpec,
-  exportShareCardPng,
+  exportShareCardBlob,
   renderShareCard,
   sanitizeFilename,
   SHARE_CARD_RATIOS,
@@ -137,7 +137,7 @@ export function ShareCardModal() {
     if (!finalSpec || busy) return
     setBusy(true)
     try {
-      const blob = await exportShareCardPng(finalSpec, ratio, cover)
+      const { blob, ext } = await exportShareCardBlob(finalSpec, ratio, cover)
       if (!blob) {
         useUiStore.getState().setToast('导出失败，请重试')
         return
@@ -145,7 +145,7 @@ export function ShareCardModal() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `CsPlayer - ${sanitizeFilename(finalSpec.title)}.png`
+      a.download = `CsPlayer - ${sanitizeFilename(finalSpec.title)}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
       useUiStore.getState().setToast('已导出分享卡片')

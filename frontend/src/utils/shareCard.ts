@@ -137,6 +137,7 @@ const H_PAGE_PAD = 88 // 横版页边
 const COVER_GAP = 56 // 竖版封面-文字间距
 const H_TEXT_GAP = 72 // 横版封面-文案列间距
 const BOTTOM_PAD = 44 // 底部评论块距底边（原落款行位置）
+const MAX_EXPORT_BYTES = 2000 * 1024 // 导出体积红线（需求方定：≤ 2MB）
 
 /** 字号体系：竖 / 横两套（font 字符串不含字体栈） */
 interface Fonts {
@@ -493,13 +494,30 @@ export function renderShareCard(
  * 导出
  * --------------------------------------------------------------------- */
 
-/** 离屏渲染 → PNG Blob（scale=1 基准尺寸） */
-export function exportShareCardPng(
+/**
+ * 离屏渲染 → 导出 Blob（scale=1 基准尺寸）。
+ * 体积红线 2000KB：PNG 超限时降级 JPEG（画质逐档 0.92 → 0.72），卡片为不透明底无透明损失。
+ */
+export async function exportShareCardBlob(
   spec: ShareCardSpec,
   ratio: ShareCardRatio,
   cover: HTMLImageElement | null,
-): Promise<Blob | null> {
+): Promise<{ blob: Blob; ext: 'png' | 'jpg' }> {
   const canvas = document.createElement('canvas')
   renderShareCard(canvas, spec, ratio, cover, 1)
-  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png'))
+  const toBlob = (type: string, quality?: number) =>
+    new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality))
+
+  // 优先 PNG（无损）；超体积红线（9:16 / 16:9 大图常见）→ 同画布 JPEG 逐档压质，分辨率不变
+  const png = await toBlob('image/png')
+  if (png && png.size <= MAX_EXPORT_BYTES) return { blob: png, ext: 'png' }
+
+  let last: Blob | null = null
+  for (const q of [0.92, 0.86, 0.8, 0.72]) {
+    const jpg = await toBlob('image/jpeg', q)
+    if (!jpg) continue
+    last = jpg
+    if (jpg.size <= MAX_EXPORT_BYTES) return { blob: jpg, ext: 'jpg' }
+  }
+  return last ? { blob: last, ext: 'jpg' } : { blob: png ?? last!, ext: 'png' }
 }
