@@ -4,7 +4,6 @@
  */
 import type { NavigateFunction } from 'react-router-dom'
 import { libraryApi } from '../api'
-import { useLikesStore } from '../stores/likesStore'
 import { usePlayerStore } from '../stores/playerStore'
 import { useUiStore } from '../stores/uiStore'
 import type { QueueSource, SongSummary } from '../types'
@@ -41,10 +40,6 @@ export interface ContextAction {
 /* ------------------------------------------------------------------ */
 /* 目标辅助                                                            */
 /* ------------------------------------------------------------------ */
-
-function songOf(target: ContextTarget): SongSummary | null {
-  return target.kind === 'song' ? target.song : null
-}
 
 function albumIdOf(target: ContextTarget): number {
   if (target.kind === 'song') return target.song.albumId
@@ -153,7 +148,7 @@ export const CONTEXT_ACTIONS: ContextAction[] = [
   },
   {
     id: 'addQueue',
-    label: '加入队列',
+    label: '加入队列末尾',
     icon: '＋',
     kinds: ['song', 'album', 'playlist'],
     run: async ({ target, close, toast }) => {
@@ -170,21 +165,6 @@ export const CONTEXT_ACTIONS: ContextAction[] = [
       } catch (e) {
         toast(e instanceof Error ? e.message : '操作失败')
       }
-    },
-  },
-  {
-    id: 'like',
-    name: '喜欢 / 取消喜欢',
-    label: (target) => {
-      const song = songOf(target)
-      return song && useLikesStore.getState().ids.has(song.id) ? '取消喜欢' : '喜欢'
-    },
-    icon: '♥',
-    kinds: ['song'],
-    run: async ({ target, close }) => {
-      close()
-      const song = songOf(target)
-      if (song) await useLikesStore.getState().toggle(song)
     },
   },
   {
@@ -257,19 +237,6 @@ export const CONTEXT_ACTIONS: ContextAction[] = [
       }
       const ok = await copyText(link)
       toast(ok ? '已复制网易云网页版链接' : '复制失败')
-    },
-  },
-  {
-    id: 'copySongId',
-    label: '复制歌曲 ID',
-    icon: '#',
-    kinds: ['song'],
-    run: async ({ target, close, toast }) => {
-      close()
-      const song = songOf(target)
-      if (!song) return
-      const ok = await copyText(String(song.id))
-      toast(ok ? `已复制歌曲 ID：${song.id}` : '复制失败')
     },
   },
   {

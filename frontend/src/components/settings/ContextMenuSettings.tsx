@@ -9,16 +9,12 @@ import { useContextMenuStore } from '../../stores/contextMenuStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { Segmented, SettingSection, Switch } from './controls'
 
+/**
+ * 需要额外说明的条目：在小标题后以 ⓘ 提示（hover 看全文），不再占一整行 hint。
+ * 仅保留必要项（复制链接的复制目标易误解）。
+ */
 const ACTION_HINT: Record<string, string> = {
-  play: '替换队列并从目标开始播放',
-  playNext: '插入到当前曲之后',
-  addQueue: '追加到播放队列末尾',
-  like: '红心同步云端「我喜欢的音乐」',
-  removeFromQueue: '仅播放队列项会出现',
-  viewAlbum: '跳转所属专辑页',
-  viewArtist: '跳转歌手页（热门歌曲 + 专辑）',
-  copyLink: '复制网易云（wyy）网页版链接到剪贴板',
-  copySongId: '复制歌曲数字 ID，便于分享 / 调试',
+  copyLink: '复制网易云音乐网页版链接，一键保存到剪贴板。',
 }
 
 /**
@@ -65,12 +61,13 @@ export function ContextMenuSettings() {
           </button>
         </div>
 
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-1">
           {group.order.map((id, index) => {
             const action = actionById(id)
             if (!action) return null
             const visible = !group.hidden.includes(id)
-            const label = displayNameOf(action)
+            const label = displayNameOf(action) // 统一为「小图标 + 小标题」单行（与 分享卡片 / 查看来源 一致）
+            const hint = ACTION_HINT[id]
             const dragging = dragIndex === index
             return (
               <div
@@ -98,7 +95,7 @@ export function ContextMenuSettings() {
                   setOverIndex(null)
                 }}
                 className={[
-                  'flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors',
+                  'flex items-center gap-2 rounded-lg border px-2.5 py-1.5 transition-colors',
                   dragging
                     ? 'border-accent/50 bg-neutral-800/80 opacity-60'
                     : overIndex === index && dragIndex != null && dragIndex !== index
@@ -117,11 +114,19 @@ export function ContextMenuSettings() {
                 <span className="w-4 shrink-0 text-center text-xs leading-none text-neutral-500">
                   {action.icon}
                 </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm text-neutral-100">{label}</div>
-                  <div className="truncate text-xs leading-4 text-neutral-500">
-                    {ACTION_HINT[id] || ''}
-                  </div>
+                <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                  <span className="min-w-0 truncate text-sm leading-5 text-neutral-100">
+                    {label}
+                  </span>
+                  {hint && (
+                    <span
+                      title={hint}
+                      aria-label={hint}
+                      className="flex h-3.5 w-3.5 shrink-0 cursor-help items-center justify-center rounded-full border border-neutral-600 text-[9px] font-medium leading-none text-neutral-400"
+                    >
+                      i
+                    </span>
+                  )}
                 </div>
                 <div className="flex shrink-0 items-center">
                   <button
